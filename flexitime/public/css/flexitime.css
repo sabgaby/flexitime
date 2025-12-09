@@ -104,10 +104,12 @@
 .roll-call-toolbar .toolbar-options {
 	display: flex;
 	align-items: center;
+	gap: var(--padding-md);
 }
 
 .roll-call-toolbar .toolbar-options .checkbox {
 	color: var(--text-color);
+	margin: 0;
 }
 
 .roll-call-toolbar .toolbar-options .checkbox label {
@@ -115,6 +117,8 @@
 	align-items: center;
 	gap: var(--padding-xs);
 	font-size: var(--text-sm);
+	margin: 0;
+	padding: var(--padding-xs) 0;
 }
 
 /* =====================================================
@@ -685,15 +689,221 @@
 }
 
 /* =====================================================
-   PRESENCE DIALOG - REDESIGNED
+   PRESENCE DIALOG - COMPACT REDESIGN
    ===================================================== */
 
 /* Container */
+.presence-dialog-compact {
+	padding: 0;
+}
+
+/* Header row - Employee/Date | Tabs | Toggle */
+.dialog-header-row {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: var(--padding-md);
+	padding-bottom: var(--padding-sm);
+	margin-bottom: var(--padding-md);
+	border-bottom: 1px solid var(--border-color);
+	flex-wrap: wrap;
+}
+
+.dialog-header-row .header-info {
+	font-size: var(--text-sm);
+}
+
+.dialog-header-row .header-controls {
+	display: flex;
+	align-items: center;
+	gap: var(--padding-md);
+}
+
+/* Mode tabs (Full Day | Split) */
+.mode-tabs {
+	display: flex;
+	background: var(--gray-100);
+	border-radius: var(--border-radius);
+	padding: 2px;
+}
+
+[data-theme="dark"] .mode-tabs {
+	background: var(--gray-800);
+}
+
+.mode-tab {
+	padding: 4px 12px;
+	font-size: var(--text-sm);
+	font-weight: 500;
+	border: none;
+	background: transparent;
+	color: var(--text-muted);
+	border-radius: var(--border-radius);
+	cursor: pointer;
+	transition: all 0.15s ease;
+}
+
+.mode-tab:hover {
+	color: var(--text-color);
+}
+
+.mode-tab.active {
+	background: var(--card-bg);
+	color: var(--text-color);
+	box-shadow: var(--shadow-sm);
+}
+
+[data-theme="dark"] .mode-tab.active {
+	background: var(--gray-700);
+}
+
+/* Show All toggle switch */
+.show-all-toggle {
+	display: flex;
+	align-items: center;
+	gap: var(--padding-xs);
+	cursor: pointer;
+	font-size: var(--text-sm);
+	color: var(--text-muted);
+}
+
+.show-all-toggle .show-all-check {
+	display: none;
+}
+
+.show-all-toggle .toggle-switch {
+	width: 32px;
+	height: 18px;
+	background: var(--gray-300);
+	border-radius: 9px;
+	position: relative;
+	transition: background 0.2s ease;
+}
+
+[data-theme="dark"] .show-all-toggle .toggle-switch {
+	background: var(--gray-600);
+}
+
+.show-all-toggle .toggle-switch::after {
+	content: '';
+	position: absolute;
+	width: 14px;
+	height: 14px;
+	background: white;
+	border-radius: 50%;
+	top: 2px;
+	left: 2px;
+	transition: transform 0.2s ease;
+	box-shadow: var(--shadow-sm);
+}
+
+.show-all-toggle .show-all-check:checked + .toggle-switch {
+	background: var(--blue-500);
+}
+
+.show-all-toggle .show-all-check:checked + .toggle-switch::after {
+	transform: translateX(14px);
+}
+
+.show-all-toggle .toggle-label {
+	font-weight: 500;
+}
+
+/* Options sections (working / not-working) */
+.options-section {
+	margin-bottom: var(--padding-sm);
+}
+
+.options-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--padding-sm);
+}
+
+.options-row:empty {
+	display: none;
+}
+
+/* Visual divider between working and not-working */
+.options-divider {
+	height: 1px;
+	background: var(--border-color);
+	margin: var(--padding-md) 0;
+}
+
+.options-divider-sm {
+	height: 1px;
+	background: var(--border-color);
+	margin: var(--padding-sm) 0;
+}
+
+/* Split day notice */
+.split-notice {
+	font-size: var(--text-xs);
+	color: var(--yellow-700);
+	background: var(--yellow-50);
+	padding: var(--padding-xs) var(--padding-sm);
+	border-radius: var(--border-radius);
+	margin-bottom: var(--padding-md);
+	text-align: center;
+}
+
+[data-theme="dark"] .split-notice {
+	background: color-mix(in srgb, var(--yellow-900) 30%, var(--gray-800));
+	color: var(--yellow-300);
+}
+
+/* Split columns */
+.split-columns {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: var(--padding-md);
+}
+
+.split-column {
+	padding: var(--padding-sm);
+	background: var(--card-bg);
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius-md);
+}
+
+[data-theme="dark"] .split-column {
+	background: var(--card-bg);
+}
+
+.split-column .column-label {
+	font-weight: 600;
+	font-size: var(--text-sm);
+	text-align: center;
+	margin-bottom: var(--padding-sm);
+	padding-bottom: var(--padding-xs);
+	border-bottom: 1px solid var(--border-color);
+	color: var(--heading-color);
+}
+
+/* Smaller options in split mode */
+.split-column .presence-option {
+	padding: var(--padding-xs) var(--padding-sm);
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.split-column .option-icon {
+	font-size: 14px;
+}
+
+.split-column .option-label {
+	font-size: var(--text-xs);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* Legacy dialog styles - kept for compatibility */
 .presence-dialog-redesign {
 	padding: 0;
 }
 
-/* Header - Employee + Date | Split Day checkbox */
 .presence-dialog-header {
 	display: flex;
 	justify-content: space-between;
@@ -766,7 +976,7 @@
 	gap: var(--padding-md);
 }
 
-/* Split Day Mode */
+/* Split Day Mode - legacy */
 .split-day-selector .split-warning {
 	display: flex;
 	align-items: center;
@@ -784,18 +994,6 @@
 	color: var(--yellow-300);
 }
 
-.split-columns {
-	display: grid;
-	grid-template-columns: 1fr 1fr;
-	gap: var(--padding-md);
-}
-
-.split-column {
-	padding: var(--padding-md);
-	background: transparent;
-	border-radius: var(--border-radius-md);
-}
-
 .split-column .column-header {
 	font-weight: 600;
 	font-size: var(--text-base);
@@ -804,23 +1002,6 @@
 	padding-bottom: var(--padding-xs);
 	border-bottom: 1px solid var(--border-color);
 	color: var(--heading-color);
-}
-
-/* Split column has smaller options grid */
-.split-column .category-options {
-	grid-template-columns: 1fr;
-}
-
-.split-column .presence-option {
-	padding: var(--padding-xs) var(--padding-sm);
-}
-
-.split-column .option-icon {
-	font-size: 14px;
-}
-
-.split-column .option-label {
-	font-size: var(--text-xs);
 }
 
 /* Disabled state for not-working options in split mode */

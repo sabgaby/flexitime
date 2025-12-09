@@ -83,11 +83,72 @@ class RollCallTable {
 			console.log('Could not get current employee:', e);
 		}
 
+		// Load Flexitime Settings for roll_call_start_day
+		await this.load_settings();
+
 		// Load presence types
 		await this.load_presence_types();
 
 		// Render
 		await this.refresh();
+	}
+
+	async load_settings() {
+		try {
+			const result = await frappe.call({
+				method: 'frappe.client.get_value',
+				args: {
+					doctype: 'Flexitime Settings',
+					fieldname: ['roll_call_start_day', 'roll_call_display_name']
+				}
+			});
+			const start_day_setting = result.message?.roll_call_start_day || 'Today';
+			this.display_name_format = result.message?.roll_call_display_name || 'Full Name';
+
+			if (start_day_setting === 'Start of Week') {
+				// Get Monday of current week
+				this.start_date = this.get_start_of_week(frappe.datetime.get_today());
+			} else {
+				// Default: Today
+				this.start_date = frappe.datetime.get_today();
+			}
+		} catch (e) {
+			console.log('Could not load Flexitime Settings:', e);
+			// Default to today
+			this.start_date = frappe.datetime.get_today();
+			this.display_name_format = 'Full Name';
+		}
+	}
+
+	/**
+	 * Format employee display name based on settings
+	 * @param {Object} employee - Employee object with employee_name and nickname
+	 * @returns {string} Formatted display name
+	 */
+	format_display_name(employee) {
+		const full_name = employee.employee_name || employee.name;
+		const nickname = employee.nickname || '';
+
+		switch (this.display_name_format) {
+			case 'Nickname':
+				return nickname || full_name;
+			case 'Nickname (Full Name)':
+				return nickname ? `${nickname} (${full_name})` : full_name;
+			case 'Full Name (Nickname)':
+				return nickname ? `${full_name} (${nickname})` : full_name;
+			default: // 'Full Name'
+				return full_name;
+		}
+	}
+
+	get_start_of_week(date_str) {
+		// Returns Monday of the week containing the given date
+		const date = frappe.datetime.str_to_obj(date_str);
+		const day_of_week = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
+		const days_since_monday = day_of_week === 0 ? 6 : day_of_week - 1;
+		const monday = new Date(date);
+		monday.setDate(date.getDate() - days_since_monday);
+		return frappe.datetime.obj_to_str(monday);
 	}
 
 	async load_presence_types() {
@@ -96,7 +157,7 @@ class RollCallTable {
 				method: 'frappe.client.get_list',
 				args: {
 					doctype: 'Presence Type',
-					fields: ['name', 'label', 'icon', 'category', 'color', 'is_system', 'requires_leave_application', 'leave_type'],
+					fields: ['name', 'label', 'icon', 'category', 'color', 'is_system', 'requires_leave_application', 'leave_type', 'show_in_quick_dialog', 'available_to_all'],
 					filters: {},
 					order_by: 'sort_order asc',
 					limit_page_length: 0
@@ -106,6 +167,35 @@ class RollCallTable {
 		} catch (e) {
 			console.error('Error loading presence types:', e);
 			this.presence_types = [];
+		}
+	}
+
+	/**
+	 * Get available presence types for dialog - uses cached data for speed
+	 * For bulk operations (no specific employee)
+	 */
+	get_dialog_presence_types() {
+		// Use cached presence types, filter to non-system available_to_all types
+		// This is fast - no API call needed for basic display
+		const available = this.presence_types.filter(t => !t.is_system && t.available_to_all);
+		return available;
+	}
+
+	/**
+	 * Get available presence types for a specific employee
+	 * Calls API to check employee-specific permissions from Employee Presence Settings
+	 */
+	async get_employee_presence_types(employee, date) {
+		try {
+			const result = await frappe.call({
+				method: 'flexitime.flexitime.doctype.presence_type.presence_type.get_available_presence_types',
+				args: { employee, date }
+			});
+			return result.message || [];
+		} catch (e) {
+			console.error('Error loading employee presence types:', e);
+			// Fallback to cached available_to_all types
+			return this.get_dialog_presence_types();
 		}
 	}
 
@@ -150,7 +240,7 @@ class RollCallTable {
 					method: 'frappe.client.get_list',
 					args: {
 						doctype: 'Employee',
-						fields: ['name', 'employee_name', 'image'],
+						fields: ['name', 'employee_name', 'nickname', 'image'],
 						filters: emp_filters,
 						order_by: 'employee_name asc',
 						limit_page_length: 0
@@ -459,9 +549,10 @@ class RollCallTable {
 
 	render_employee_row(emp, days) {
 		const is_own = emp.name === this.current_employee;
+		const display_name = this.format_display_name(emp);
 		const avatar = emp.image
 			? `<img src="${emp.image}" class="avatar-img">`
-			: `<span class="avatar-letter">${emp.employee_name.charAt(0).toUpperCase()}</span>`;
+			: `<span class="avatar-letter">${(emp.nickname || emp.employee_name).charAt(0).toUpperCase()}</span>`;
 
 		let cells = '';
 		let prev_visible_day = null;
@@ -488,7 +579,7 @@ class RollCallTable {
 				<td class="employee-col">
 					<div class="employee-info">
 						<div class="employee-avatar">${avatar}</div>
-						<span class="employee-name">${emp.employee_name}</span>
+						<span class="employee-name">${display_name}</span>
 					</div>
 				</td>
 				${cells}
@@ -888,7 +979,8 @@ class RollCallTable {
 			const employee = $cell.data('employee');
 			const date = $cell.data('date');
 			const emp = self.employees.find(e => e.name === employee);
-			self.show_presence_dialog(employee, date, emp?.employee_name || employee);
+			const display_name = emp ? self.format_display_name(emp) : employee;
+			self.show_presence_dialog(employee, date, display_name);
 		});
 
 		// Selection toolbar buttons
@@ -995,48 +1087,31 @@ class RollCallTable {
 		}
 	}
 
-	async show_bulk_presence_dialog() {
+	show_bulk_presence_dialog() {
 		if (this.selected_cells.size === 0) return;
 
-		// For bulk operations, fetch available types for the current user
-		// Use today's date as reference for pattern matching
-		let available_types = [];
-		try {
-			const result = await frappe.call({
-				method: 'flexitime.flexitime.doctype.presence_type.presence_type.get_available_presence_types',
-				args: {
-					employee: this.current_employee,
-					date: frappe.datetime.get_today()
-				}
-			});
-			available_types = result.message || [];
-		} catch (e) {
-			console.error('Error loading available presence types:', e);
-			// Fallback to all non-system types
-			available_types = this.presence_types.filter(t => !t.is_system);
-		}
+		// Use cached presence types for instant display - no API call needed
+		const available_types = this.get_dialog_presence_types();
 
 		// Split into quick (show_in_quick_dialog=1) and extended types
 		const working_quick = available_types.filter(t => t.category === 'Working' && t.show_in_quick_dialog);
 		const working_extended = available_types.filter(t => t.category === 'Working' && !t.show_in_quick_dialog);
 		const not_working_quick = available_types.filter(t => t.category === 'Leave' && t.show_in_quick_dialog);
 		const not_working_extended = available_types.filter(t => t.category === 'Leave' && !t.show_in_quick_dialog);
+		const all_not_working = [...not_working_quick, ...not_working_extended];
 
-		const make_options = (types, prefix = '', extra_class = '') => types.map(pt => `
-			<div class="presence-option ${extra_class}" data-type="${pt.name}" data-category="${pt.category}" data-prefix="${prefix}" style="--option-color: ${this.get_color_var(pt.color)}">
+		// Check if there are any extended options to show
+		const has_extended = working_extended.length > 0 || not_working_extended.length > 0;
+
+		const make_options = (types) => types.map(pt => `
+			<div class="presence-option" data-type="${pt.name}" data-category="${pt.category}" style="--option-color: ${this.get_color_var(pt.color)}">
 				<span class="option-icon">${pt.icon || '•'}</span>
 				<span class="option-label">${pt.label}</span>
 			</div>
 		`).join('');
 
-		const make_show_more_toggle = (category, count) => count > 0 ? `
-			<div class="show-more-toggle" data-category="${category}">
-				<span class="toggle-icon">+</span>
-				<span class="toggle-text">${__('Show more')} (${count})</span>
-			</div>
-		` : '';
-
 		let is_split_day = false;
+		let show_all = false;
 		let full_day_type = null;
 		let am_type = null;
 		let pm_type = null;
@@ -1048,96 +1123,104 @@ class RollCallTable {
 					fieldtype: 'HTML',
 					fieldname: 'content',
 					options: `
-						<div class="presence-dialog-redesign">
-							<!-- Header: Cell count | Split Day checkbox -->
-							<div class="presence-dialog-header">
+						<div class="presence-dialog-compact">
+							<!-- Header: Cell count | Tabs | Toggle -->
+							<div class="dialog-header-row">
 								<div class="header-info">
-									<strong>${__("{0} cells selected", [this.selected_cells.size])}</strong>
+									<strong>${__("{0} cells", [this.selected_cells.size])}</strong>
 								</div>
-								<div class="header-toggle">
-									<label class="split-day-label">
-										<input type="checkbox" class="split-day-check">
-										<span>${__('Split Day')}</span>
+								<div class="header-controls">
+									<div class="mode-tabs">
+										<button type="button" class="mode-tab active" data-mode="full">${__('Full Day')}</button>
+										<button type="button" class="mode-tab" data-mode="split">${__('Split')}</button>
+									</div>
+									${has_extended ? `
+									<label class="show-all-toggle">
+										<input type="checkbox" class="show-all-check">
+										<span class="toggle-switch"></span>
+										<span class="toggle-label">${__('All')}</span>
 									</label>
+									` : ''}
 								</div>
 							</div>
 
 							<!-- Full Day Mode -->
-							<div class="full-day-selector">
-								<div class="presence-category">
-									<div class="category-title">${__('WORKING')}</div>
-									<div class="category-options working-options quick-options">
+							<div class="full-day-content">
+								<div class="options-section working-section">
+									<div class="options-row quick-options">
 										${make_options(working_quick)}
 									</div>
-									${make_show_more_toggle('working', working_extended.length)}
-									<div class="category-options working-options extended-options" style="display:none">
-										${make_options(working_extended, '', 'extended-option')}
+									${working_extended.length ? `
+									<div class="options-row extended-options" style="display:none">
+										${make_options(working_extended)}
 									</div>
+									` : ''}
 								</div>
-								<div class="category-divider"></div>
-								<div class="presence-category">
-									<div class="category-title">${__('NOT WORKING')}</div>
-									<div class="category-options not-working-options quick-options">
+								<div class="options-divider"></div>
+								<div class="options-section not-working-section">
+									<div class="options-row quick-options">
 										${make_options(not_working_quick)}
 									</div>
-									${make_show_more_toggle('not-working', not_working_extended.length)}
-									<div class="category-options not-working-options extended-options" style="display:none">
-										${make_options(not_working_extended, '', 'extended-option')}
+									${not_working_extended.length ? `
+									<div class="options-row extended-options" style="display:none">
+										${make_options(not_working_extended)}
 									</div>
+									` : ''}
 								</div>
 							</div>
 
 							<!-- Split Day Mode -->
-							<div class="split-day-selector" style="display:none">
-								<div class="split-warning">
-									<span class="warning-icon">⚠️</span>
-									<span>${__('Only one half can be Not Working')}</span>
+							<div class="split-day-content" style="display:none">
+								<div class="split-notice">
+									<span>⚠️ ${__('Only one half can be leave')}</span>
 								</div>
 								<div class="split-columns">
 									<div class="split-column am-column">
-										<div class="column-header">${__('AM')}</div>
-										<div class="presence-category">
-											<div class="category-title-small">${__('WORKING')}</div>
-											<div class="category-options am-working-options quick-options">
-												${make_options(working_quick, 'am')}
+										<div class="column-label">${__('AM')}</div>
+										<div class="options-section working-section">
+											<div class="options-row quick-options">
+												${make_options(working_quick)}
 											</div>
-											${make_show_more_toggle('am-working', working_extended.length)}
-											<div class="category-options am-working-options extended-options" style="display:none">
-												${make_options(working_extended, 'am', 'extended-option')}
+											${working_extended.length ? `
+											<div class="options-row extended-options" style="display:none">
+												${make_options(working_extended)}
 											</div>
+											` : ''}
 										</div>
-										<div class="presence-category">
-											<div class="category-title-small">${__('NOT WORKING')}</div>
-											<div class="category-options am-not-working-options quick-options">
-												${make_options(not_working_quick, 'am')}
+										<div class="options-divider-sm"></div>
+										<div class="options-section not-working-section">
+											<div class="options-row quick-options">
+												${make_options(not_working_quick)}
 											</div>
-											${make_show_more_toggle('am-not-working', not_working_extended.length)}
-											<div class="category-options am-not-working-options extended-options" style="display:none">
-												${make_options(not_working_extended, 'am', 'extended-option')}
+											${not_working_extended.length ? `
+											<div class="options-row extended-options" style="display:none">
+												${make_options(not_working_extended)}
 											</div>
+											` : ''}
 										</div>
 									</div>
 									<div class="split-column pm-column">
-										<div class="column-header">${__('PM')}</div>
-										<div class="presence-category">
-											<div class="category-title-small">${__('WORKING')}</div>
-											<div class="category-options pm-working-options quick-options">
-												${make_options(working_quick, 'pm')}
+										<div class="column-label">${__('PM')}</div>
+										<div class="options-section working-section">
+											<div class="options-row quick-options">
+												${make_options(working_quick)}
 											</div>
-											${make_show_more_toggle('pm-working', working_extended.length)}
-											<div class="category-options pm-working-options extended-options" style="display:none">
-												${make_options(working_extended, 'pm', 'extended-option')}
+											${working_extended.length ? `
+											<div class="options-row extended-options" style="display:none">
+												${make_options(working_extended)}
 											</div>
+											` : ''}
 										</div>
-										<div class="presence-category">
-											<div class="category-title-small">${__('NOT WORKING')}</div>
-											<div class="category-options pm-not-working-options quick-options">
-												${make_options(not_working_quick, 'pm')}
+										<div class="options-divider-sm"></div>
+										<div class="options-section not-working-section">
+											<div class="options-row quick-options">
+												${make_options(not_working_quick)}
 											</div>
-											${make_show_more_toggle('pm-not-working', not_working_extended.length)}
-											<div class="category-options pm-not-working-options extended-options" style="display:none">
-												${make_options(not_working_extended, 'pm', 'extended-option')}
+											${not_working_extended.length ? `
+											<div class="options-row extended-options" style="display:none">
+												${make_options(not_working_extended)}
 											</div>
+											` : ''}
 										</div>
 									</div>
 								</div>
@@ -1145,65 +1228,50 @@ class RollCallTable {
 						</div>
 					`
 				}
-			],
-			primary_action_label: __('Apply'),
-			primary_action: async () => {
-				if (!is_split_day) {
-					if (!full_day_type) {
-						frappe.show_alert({ message: __('Please select a presence type'), indicator: 'orange' });
-						return;
-					}
-					d.hide();
-					await this.save_bulk_entries(full_day_type, 'full');
-				} else {
-					if (!am_type || !pm_type) {
-						frappe.show_alert({ message: __('Please select both AM and PM types'), indicator: 'orange' });
-						return;
-					}
-					d.hide();
-					await this.save_bulk_split_entries(am_type, pm_type);
-				}
-			}
+			]
 		});
 
-		// Show more toggle handlers
-		d.$wrapper.find('.show-more-toggle').on('click', function() {
-			const $toggle = $(this);
-			const $extended = $toggle.next('.extended-options');
-			const is_expanded = $extended.is(':visible');
+		// Hide primary action button - we auto-save on selection
+		d.$wrapper.find('.btn-primary').hide();
 
-			if (is_expanded) {
-				$extended.slideUp(150);
-				$toggle.find('.toggle-icon').text('+');
-				$toggle.find('.toggle-text').text(__('Show more') + ` (${$extended.find('.presence-option').length})`);
-			} else {
-				$extended.slideDown(150);
-				$toggle.find('.toggle-icon').text('−');
-				$toggle.find('.toggle-text').text(__('Show less'));
-			}
-		});
+		const self = this;
 
-		// Split Day checkbox toggle
-		d.$wrapper.find('.split-day-check').on('change', function() {
-			is_split_day = $(this).is(':checked');
+		// Tab switching
+		d.$wrapper.find('.mode-tab').on('click', function() {
+			const mode = $(this).data('mode');
+			d.$wrapper.find('.mode-tab').removeClass('active');
+			$(this).addClass('active');
+
+			is_split_day = mode === 'split';
 			if (is_split_day) {
-				d.$wrapper.find('.full-day-selector').hide();
-				d.$wrapper.find('.split-day-selector').show();
+				d.$wrapper.find('.full-day-content').hide();
+				d.$wrapper.find('.split-day-content').show();
 			} else {
-				d.$wrapper.find('.full-day-selector').show();
-				d.$wrapper.find('.split-day-selector').hide();
+				d.$wrapper.find('.full-day-content').show();
+				d.$wrapper.find('.split-day-content').hide();
 			}
 		});
 
-		// Full day selection
-		d.$wrapper.find('.full-day-selector .presence-option').on('click', function() {
-			d.$wrapper.find('.full-day-selector .presence-option').removeClass('selected');
+		// Show All toggle
+		d.$wrapper.find('.show-all-check').on('change', function() {
+			show_all = $(this).is(':checked');
+			if (show_all) {
+				d.$wrapper.find('.extended-options').slideDown(150);
+			} else {
+				d.$wrapper.find('.extended-options').slideUp(150);
+			}
+		});
+
+		// Full day selection - AUTO-SAVE on click
+		d.$wrapper.find('.full-day-content .presence-option').on('click', async function() {
+			d.$wrapper.find('.full-day-content .presence-option').removeClass('selected');
 			$(this).addClass('selected');
 			full_day_type = $(this).data('type');
-		});
 
-		// Combine quick and extended not_working for validation
-		const all_not_working = [...not_working_quick, ...not_working_extended];
+			// Auto-save and close
+			d.hide();
+			await self.save_bulk_entries(full_day_type, 'full');
+		});
 
 		// Update not-working disabled state for split day
 		const updateNotWorkingState = () => {
@@ -1211,27 +1279,37 @@ class RollCallTable {
 			const pm_is_not_working = pm_type && all_not_working.some(t => t.name === pm_type);
 
 			// If AM has not-working selected, disable PM not-working options
-			d.$wrapper.find('.pm-not-working-options .presence-option').toggleClass('disabled', am_is_not_working);
+			d.$wrapper.find('.pm-column .not-working-section .presence-option').toggleClass('disabled', am_is_not_working);
 			// If PM has not-working selected, disable AM not-working options
-			d.$wrapper.find('.am-not-working-options .presence-option').toggleClass('disabled', pm_is_not_working);
+			d.$wrapper.find('.am-column .not-working-section .presence-option').toggleClass('disabled', pm_is_not_working);
+		};
+
+		// Auto-save when both AM and PM are selected
+		const tryAutoSaveSplit = async () => {
+			if (am_type && pm_type) {
+				d.hide();
+				await self.save_bulk_split_entries(am_type, pm_type);
+			}
 		};
 
 		// AM selection
-		d.$wrapper.find('.am-column .presence-option').on('click', function() {
+		d.$wrapper.find('.am-column .presence-option').on('click', async function() {
 			if ($(this).hasClass('disabled')) return;
 			d.$wrapper.find('.am-column .presence-option').removeClass('selected');
 			$(this).addClass('selected');
 			am_type = $(this).data('type');
 			updateNotWorkingState();
+			await tryAutoSaveSplit();
 		});
 
 		// PM selection
-		d.$wrapper.find('.pm-column .presence-option').on('click', function() {
+		d.$wrapper.find('.pm-column .presence-option').on('click', async function() {
 			if ($(this).hasClass('disabled')) return;
 			d.$wrapper.find('.pm-column .presence-option').removeClass('selected');
 			$(this).addClass('selected');
 			pm_type = $(this).data('type');
 			updateNotWorkingState();
+			await tryAutoSaveSplit();
 		});
 
 		d.show();
@@ -1241,19 +1319,8 @@ class RollCallTable {
 		const key = `${employee}|${date}`;
 		const existing = this.entries[key];
 
-		// Fetch available presence types for this specific employee and date
-		let available_types = [];
-		try {
-			const result = await frappe.call({
-				method: 'flexitime.flexitime.doctype.presence_type.presence_type.get_available_presence_types',
-				args: { employee, date }
-			});
-			available_types = result.message || [];
-		} catch (e) {
-			console.error('Error loading available presence types:', e);
-			// Fallback to all non-system types
-			available_types = this.presence_types.filter(t => !t.is_system);
-		}
+		// Get employee-specific presence types (includes Employee Presence Settings permissions)
+		const available_types = await this.get_employee_presence_types(employee, date);
 
 		// Split into quick (show_in_quick_dialog=1) and extended types
 		const working_quick = available_types.filter(t => t.category === 'Working' && t.show_in_quick_dialog);
@@ -1262,6 +1329,9 @@ class RollCallTable {
 		const not_working_extended = available_types.filter(t => t.category === 'Leave' && !t.show_in_quick_dialog);
 		const all_working = [...working_quick, ...working_extended];
 		const all_not_working = [...not_working_quick, ...not_working_extended];
+
+		// Check if there are any extended options to show
+		const has_extended = working_extended.length > 0 || not_working_extended.length > 0;
 
 		// Format date nicely: "Tue, 9 Dec"
 		const date_obj = frappe.datetime.str_to_obj(date);
@@ -1316,11 +1386,13 @@ class RollCallTable {
 										<button type="button" class="mode-tab ${!is_split_day ? 'active' : ''}" data-mode="full">${__('Full Day')}</button>
 										<button type="button" class="mode-tab ${is_split_day ? 'active' : ''}" data-mode="split">${__('Split')}</button>
 									</div>
+									${has_extended ? `
 									<label class="show-all-toggle">
 										<input type="checkbox" class="show-all-check" ${show_all ? 'checked' : ''}>
 										<span class="toggle-switch"></span>
 										<span class="toggle-label">${__('All')}</span>
 									</label>
+									` : ''}
 								</div>
 							</div>
 
@@ -1330,18 +1402,22 @@ class RollCallTable {
 									<div class="options-row quick-options">
 										${make_options(working_quick, existing?.presence_type)}
 									</div>
+									${working_extended.length ? `
 									<div class="options-row extended-options" ${!show_all ? 'style="display:none"' : ''}>
 										${make_options(working_extended, existing?.presence_type)}
 									</div>
+									` : ''}
 								</div>
 								<div class="options-divider"></div>
 								<div class="options-section not-working-section">
 									<div class="options-row quick-options">
 										${make_options(not_working_quick, existing?.presence_type)}
 									</div>
+									${not_working_extended.length ? `
 									<div class="options-row extended-options" ${!show_all ? 'style="display:none"' : ''}>
 										${make_options(not_working_extended, existing?.presence_type)}
 									</div>
+									` : ''}
 								</div>
 							</div>
 
@@ -1357,18 +1433,22 @@ class RollCallTable {
 											<div class="options-row quick-options">
 												${make_options(working_quick, existing?.am_presence_type)}
 											</div>
+											${working_extended.length ? `
 											<div class="options-row extended-options" ${!show_all ? 'style="display:none"' : ''}>
 												${make_options(working_extended, existing?.am_presence_type)}
 											</div>
+											` : ''}
 										</div>
 										<div class="options-divider-sm"></div>
 										<div class="options-section not-working-section">
 											<div class="options-row quick-options">
 												${make_options(not_working_quick, existing?.am_presence_type)}
 											</div>
+											${not_working_extended.length ? `
 											<div class="options-row extended-options" ${!show_all ? 'style="display:none"' : ''}>
 												${make_options(not_working_extended, existing?.am_presence_type)}
 											</div>
+											` : ''}
 										</div>
 									</div>
 									<div class="split-column pm-column">
@@ -1377,18 +1457,22 @@ class RollCallTable {
 											<div class="options-row quick-options">
 												${make_options(working_quick, existing?.pm_presence_type)}
 											</div>
+											${working_extended.length ? `
 											<div class="options-row extended-options" ${!show_all ? 'style="display:none"' : ''}>
 												${make_options(working_extended, existing?.pm_presence_type)}
 											</div>
+											` : ''}
 										</div>
 										<div class="options-divider-sm"></div>
 										<div class="options-section not-working-section">
 											<div class="options-row quick-options">
 												${make_options(not_working_quick, existing?.pm_presence_type)}
 											</div>
+											${not_working_extended.length ? `
 											<div class="options-row extended-options" ${!show_all ? 'style="display:none"' : ''}>
 												${make_options(not_working_extended, existing?.pm_presence_type)}
 											</div>
+											` : ''}
 										</div>
 									</div>
 								</div>
@@ -1397,30 +1481,16 @@ class RollCallTable {
 					`
 				}
 			],
-			primary_action_label: __('Save'),
-			primary_action: async () => {
-				if (!is_split_day) {
-					if (!full_day_type) {
-						frappe.show_alert({ message: __('Please select a presence type'), indicator: 'orange' });
-						return;
-					}
-					d.hide();
-					await this.save_entry(employee, date, full_day_type, false);
-				} else {
-					if (!am_type || !pm_type) {
-						frappe.show_alert({ message: __('Please select both AM and PM types'), indicator: 'orange' });
-						return;
-					}
-					d.hide();
-					await this.save_split_entry(employee, date, am_type, pm_type);
-				}
-			},
+			// Only show Clear button if there's existing data
 			secondary_action_label: existing ? __('Clear') : null,
 			secondary_action: existing ? async () => {
 				d.hide();
 				await this.delete_entry(employee, date);
 			} : null
 		});
+
+		// Hide primary action button - we auto-save on selection
+		d.$wrapper.find('.btn-primary').hide();
 
 		// Tab switching
 		d.$wrapper.find('.mode-tab').on('click', function() {
@@ -1448,12 +1518,18 @@ class RollCallTable {
 			}
 		});
 
-		// Full day selection
-		d.$wrapper.find('.full-day-content .presence-option').on('click', function() {
+		// Full day selection - AUTO-SAVE on click
+		d.$wrapper.find('.full-day-content .presence-option').on('click', async function() {
 			d.$wrapper.find('.full-day-content .presence-option').removeClass('selected');
 			$(this).addClass('selected');
 			full_day_type = $(this).data('type');
+
+			// Auto-save and close
+			d.hide();
+			await self.save_entry(employee, date, full_day_type, false);
 		});
+
+		const self = this;
 
 		// Update not-working disabled state for split day
 		const updateNotWorkingState = () => {
@@ -1466,22 +1542,32 @@ class RollCallTable {
 			d.$wrapper.find('.am-column .not-working-section .presence-option').toggleClass('disabled', pm_is_not_working);
 		};
 
+		// Auto-save when both AM and PM are selected
+		const tryAutoSaveSplit = async () => {
+			if (am_type && pm_type) {
+				d.hide();
+				await self.save_split_entry(employee, date, am_type, pm_type);
+			}
+		};
+
 		// AM selection
-		d.$wrapper.find('.am-column .presence-option').on('click', function() {
+		d.$wrapper.find('.am-column .presence-option').on('click', async function() {
 			if ($(this).hasClass('disabled')) return;
 			d.$wrapper.find('.am-column .presence-option').removeClass('selected');
 			$(this).addClass('selected');
 			am_type = $(this).data('type');
 			updateNotWorkingState();
+			await tryAutoSaveSplit();
 		});
 
 		// PM selection
-		d.$wrapper.find('.pm-column .presence-option').on('click', function() {
+		d.$wrapper.find('.pm-column .presence-option').on('click', async function() {
 			if ($(this).hasClass('disabled')) return;
 			d.$wrapper.find('.pm-column .presence-option').removeClass('selected');
 			$(this).addClass('selected');
 			pm_type = $(this).data('type');
 			updateNotWorkingState();
+			await tryAutoSaveSplit();
 		});
 
 		// Initial state update
@@ -1731,9 +1817,9 @@ class RollCallTable {
 		});
 	}
 
-	goto_today() {
-		// Reset to initial state - today + 60 days
-		this.start_date = frappe.datetime.get_today();
+	async goto_today() {
+		// Reset to initial state based on settings
+		await this.load_settings();  // Reload to get correct start date
 		this.total_days = this.INITIAL_DAYS;
 		this.visible_start_date = '';
 		this.visible_end_date = '';

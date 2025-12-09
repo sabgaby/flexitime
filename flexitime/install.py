@@ -9,6 +9,7 @@ import os
 def after_install():
 	"""Post-installation setup for Flexitime app"""
 	create_custom_fields()
+	create_client_scripts()
 	create_leave_types()
 	create_presence_types()
 	create_email_templates()
@@ -16,29 +17,60 @@ def after_install():
 
 
 def create_custom_fields():
-	"""Create custom fields on Employee DocType"""
-	custom_fields_path = os.path.join(
-		os.path.dirname(__file__),
-		"flexitime", "custom", "employee.json"
-	)
+	"""Create custom fields on various DocTypes"""
+	custom_dir = os.path.join(os.path.dirname(__file__), "flexitime", "custom")
 
-	if not os.path.exists(custom_fields_path):
+	if not os.path.exists(custom_dir):
 		return
 
-	with open(custom_fields_path) as f:
-		custom_fields = json.load(f)
+	# Process all JSON files in custom directory
+	for filename in os.listdir(custom_dir):
+		if not filename.endswith(".json"):
+			continue
 
-	for field in custom_fields:
-		# Check if field already exists
-		existing = frappe.db.exists("Custom Field", {
-			"dt": field.get("dt"),
-			"fieldname": field.get("fieldname")
-		})
+		custom_fields_path = os.path.join(custom_dir, filename)
 
-		if not existing:
-			doc = frappe.get_doc(field)
+		with open(custom_fields_path) as f:
+			custom_fields = json.load(f)
+
+		for field in custom_fields:
+			# Check if field already exists
+			existing = frappe.db.exists("Custom Field", {
+				"dt": field.get("dt"),
+				"fieldname": field.get("fieldname")
+			})
+
+			if not existing:
+				doc = frappe.get_doc(field)
+				doc.insert(ignore_permissions=True)
+				frappe.logger().info(f"Created custom field: {field.get('dt')}.{field.get('fieldname')}")
+
+
+def create_client_scripts():
+	"""Create Client Scripts for form customizations"""
+	fixture_path = os.path.join(
+		os.path.dirname(__file__),
+		"flexitime", "fixtures", "client_script.json"
+	)
+
+	if not os.path.exists(fixture_path):
+		return
+
+	with open(fixture_path) as f:
+		scripts = json.load(f)
+
+	for script in scripts:
+		# Check if already exists
+		if frappe.db.exists("Client Script", script.get("name")):
+			frappe.logger().info(f"Client Script already exists: {script.get('name')}")
+			continue
+
+		try:
+			doc = frappe.get_doc(script)
 			doc.insert(ignore_permissions=True)
-			frappe.logger().info(f"Created custom field: {field.get('fieldname')}")
+			frappe.logger().info(f"Created Client Script: {script.get('name')}")
+		except Exception as e:
+			frappe.logger().warning(f"Could not create Client Script {script.get('name')}: {e}")
 
 
 def create_leave_types():

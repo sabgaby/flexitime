@@ -4,6 +4,12 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "roll_call_section",
+  "roll_call_start_day",
+  "column_break_roll_call",
+  "roll_call_display_name",
+  "display_section",
+  "calendar_display_name",
   "auto_lock_section",
   "enable_auto_lock",
   "auto_lock_after_days",
@@ -15,6 +21,44 @@
   "reminder_email_template"
  ],
  "fields": [
+  {
+   "fieldname": "roll_call_section",
+   "fieldtype": "Section Break",
+   "label": "Roll Call"
+  },
+  {
+   "default": "Today",
+   "description": "The starting column when opening Roll Call page",
+   "fieldname": "roll_call_start_day",
+   "fieldtype": "Select",
+   "label": "Roll Call Start Day",
+   "options": "Today\nStart of Week"
+  },
+  {
+   "fieldname": "column_break_roll_call",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Full Name",
+   "description": "How to display employee names in Roll Call grid",
+   "fieldname": "roll_call_display_name",
+   "fieldtype": "Select",
+   "label": "Display Name Format",
+   "options": "Full Name\nNickname\nNickname (Full Name)\nFull Name (Nickname)"
+  },
+  {
+   "fieldname": "display_section",
+   "fieldtype": "Section Break",
+   "label": "Calendar Feed"
+  },
+  {
+   "default": "Nickname",
+   "description": "How to display employee names in calendar events (e.g. 'Gaby 😎 Vacation')",
+   "fieldname": "calendar_display_name",
+   "fieldtype": "Select",
+   "label": "Calendar Display Name",
+   "options": "Nickname\nFull Name\nNickname (Full Name)\nFull Name (Nickname)"
+  },
   {
    "fieldname": "auto_lock_section",
    "fieldtype": "Section Break",

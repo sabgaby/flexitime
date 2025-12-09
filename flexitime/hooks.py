@@ -95,7 +95,12 @@ fixtures = [
 	{
 		"dt": "Custom Field",
 		"filters": [
-			["dt", "=", "Employee"],
+			["module", "=", "Flexitime"]
+		]
+	},
+	{
+		"dt": "Client Script",
+		"filters": [
 			["module", "=", "Flexitime"]
 		]
 	},
