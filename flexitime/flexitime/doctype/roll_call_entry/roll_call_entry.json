@@ -1,0 +1,222 @@
+{
+ "actions": [],
+ "autoname": "format:{employee}-{date}",
+ "creation": "2025-01-01 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "employee",
+  "employee_name",
+  "column_break_main",
+  "date",
+  "day_of_week",
+  "section_break_presence",
+  "presence_type",
+  "presence_type_icon",
+  "presence_type_label",
+  "column_break_presence",
+  "is_half_day",
+  "half_day_type",
+  "source",
+  "leave_application",
+  "section_break_split",
+  "am_presence_type",
+  "am_presence_icon",
+  "column_break_split",
+  "pm_presence_type",
+  "pm_presence_icon",
+  "section_break_status",
+  "is_locked",
+  "notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Employee",
+   "options": "Employee",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "employee.employee_name",
+   "fieldname": "employee_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Employee Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "day_of_week",
+   "fieldtype": "Data",
+   "label": "Day of Week",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_presence",
+   "fieldtype": "Section Break",
+   "label": "Presence"
+  },
+  {
+   "fieldname": "presence_type",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Presence Type",
+   "options": "Presence Type",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "presence_type.icon",
+   "fieldname": "presence_type_icon",
+   "fieldtype": "Data",
+   "label": "Icon",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "presence_type.label",
+   "fieldname": "presence_type_label",
+   "fieldtype": "Data",
+   "label": "Presence Label",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_presence",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "True if split AM/PM presence",
+   "fieldname": "is_half_day",
+   "fieldtype": "Check",
+   "label": "Split AM/PM"
+  },
+  {
+   "depends_on": "eval:doc.is_half_day && !doc.am_presence_type",
+   "fieldname": "half_day_type",
+   "fieldtype": "Select",
+   "label": "Half Day Type",
+   "options": "\nAM\nPM"
+  },
+  {
+   "default": "Manual",
+   "fieldname": "source",
+   "fieldtype": "Select",
+   "label": "Source",
+   "options": "Manual\nLeave\nSystem",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.source=='Leave'",
+   "fieldname": "leave_application",
+   "fieldtype": "Link",
+   "label": "Leave Application",
+   "options": "Leave Application",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "depends_on": "eval:doc.is_half_day",
+   "fieldname": "section_break_split",
+   "fieldtype": "Section Break",
+   "label": "AM/PM Split"
+  },
+  {
+   "depends_on": "eval:doc.is_half_day",
+   "fieldname": "am_presence_type",
+   "fieldtype": "Link",
+   "label": "AM Presence Type",
+   "options": "Presence Type"
+  },
+  {
+   "fetch_from": "am_presence_type.icon",
+   "fieldname": "am_presence_icon",
+   "fieldtype": "Data",
+   "label": "AM Icon",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_split",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.is_half_day",
+   "fieldname": "pm_presence_type",
+   "fieldtype": "Link",
+   "label": "PM Presence Type",
+   "options": "Presence Type"
+  },
+  {
+   "fetch_from": "pm_presence_type.icon",
+   "fieldname": "pm_presence_icon",
+   "fieldtype": "Data",
+   "label": "PM Icon",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_status",
+   "fieldtype": "Section Break"
+  },
+  {
+   "default": "0",
+   "description": "True if week has closed (locked)",
+   "fieldname": "is_locked",
+   "fieldtype": "Check",
+   "label": "Is Locked",
+   "read_only": 1
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "links": [],
+ "modified": "2025-01-01 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Flexitime",
+ "name": "Roll Call Entry",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Employee",
+   "write": 1
+  }
+ ],
+ "sort_field": "date",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

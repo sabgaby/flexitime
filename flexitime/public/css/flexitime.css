@@ -1,0 +1,1179 @@
+/* Flexitime App Global Styles */
+/* Uses Frappe CSS variables for dark mode compatibility */
+
+/* =====================================================
+   ROLL CALL TABLE - NATIVE HTML TABLE
+   ===================================================== */
+
+.roll-call-container {
+	padding: var(--padding-md);
+}
+
+.roll-call-loading {
+	padding: var(--padding-xl);
+	text-align: center;
+}
+
+/* =====================================================
+   ROLL CALL TOOLBAR (Native Frappe Style)
+   ===================================================== */
+
+.roll-call-toolbar {
+	background: var(--fg-color);
+	border: 1px solid var(--border-color);
+	border-bottom: none;
+	border-radius: var(--border-radius-md) var(--border-radius-md) 0 0;
+	padding: var(--padding-md);
+}
+
+.roll-call-toolbar .toolbar-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: var(--padding-sm);
+}
+
+.roll-call-toolbar .toolbar-row + .toolbar-row {
+	margin-top: var(--padding-sm);
+	padding-top: var(--padding-sm);
+	border-top: 1px solid var(--border-color);
+}
+
+/* Navigation */
+.roll-call-toolbar .toolbar-nav {
+	display: flex;
+	align-items: center;
+	gap: var(--padding-sm);
+}
+
+.roll-call-toolbar .btn-nav-arrow {
+	padding: 4px 8px;
+	min-width: 28px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.roll-call-toolbar .btn-nav-arrow svg {
+	width: 12px;
+	height: 12px;
+}
+
+.roll-call-toolbar .visible-date-range {
+	font-weight: 500;
+	font-size: var(--text-sm);
+	color: var(--text-color);
+	min-width: 140px;
+	text-align: center;
+}
+
+.roll-call-toolbar .current-month {
+	font-weight: 600;
+	font-size: var(--text-lg);
+	min-width: 160px;
+	text-align: center;
+	color: var(--heading-color);
+}
+
+/* Filters Row */
+.roll-call-toolbar .toolbar-filters {
+	display: flex;
+	gap: var(--padding-sm);
+	flex-wrap: wrap;
+}
+
+.roll-call-toolbar .filter-field {
+	min-width: 150px;
+}
+
+.roll-call-toolbar .filter-field .frappe-control {
+	margin-bottom: 0;
+}
+
+.roll-call-toolbar .filter-field .form-group {
+	margin-bottom: 0;
+}
+
+.roll-call-toolbar .filter-field input {
+	height: 28px;
+	font-size: var(--text-sm);
+}
+
+/* Options (checkbox) */
+.roll-call-toolbar .toolbar-options {
+	display: flex;
+	align-items: center;
+}
+
+.roll-call-toolbar .toolbar-options .checkbox {
+	color: var(--text-color);
+}
+
+.roll-call-toolbar .toolbar-options .checkbox label {
+	display: flex;
+	align-items: center;
+	gap: var(--padding-xs);
+	font-size: var(--text-sm);
+}
+
+/* =====================================================
+   SELECTION TOOLBAR
+   ===================================================== */
+
+.selection-toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: var(--padding-sm) var(--padding-md);
+	background: var(--control-bg);
+	border: 1px solid var(--border-color);
+	border-top: none;
+}
+
+.selection-toolbar .selection-count {
+	font-weight: 600;
+	color: var(--text-color);
+}
+
+.selection-toolbar .selection-actions {
+	display: flex;
+	gap: var(--padding-sm);
+}
+
+/* =====================================================
+   TABLE WRAPPER
+   ===================================================== */
+
+.roll-call-table-wrapper {
+	overflow-x: auto;
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius-md);
+	background: var(--card-bg);
+}
+
+/* When toolbar is present, remove top border-radius from table */
+.roll-call-toolbar + .roll-call-table-wrapper,
+.roll-call-toolbar + .selection-toolbar + .roll-call-table-wrapper {
+	border-top-left-radius: 0;
+	border-top-right-radius: 0;
+}
+
+.roll-call-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: var(--text-sm);
+	user-select: none;
+}
+
+.roll-call-table th,
+.roll-call-table td {
+	border: 1px solid var(--border-color);
+	padding: 0;
+	text-align: center;
+	vertical-align: middle;
+}
+
+/* =====================================================
+   MONTH HEADER ROW
+   ===================================================== */
+
+.roll-call-table .month-row .month-header {
+	background: var(--subtle-fg);
+	font-weight: 600;
+	padding: var(--padding-xs) var(--padding-sm);
+	font-size: var(--text-sm);
+	color: var(--heading-color);
+	border-bottom: 2px solid var(--border-color);
+}
+
+[data-theme="dark"] .roll-call-table .month-row .month-header {
+	background: var(--gray-800);
+}
+
+/* =====================================================
+   EMPLOYEE COLUMN - STICKY
+   ===================================================== */
+
+.roll-call-table .employee-col {
+	position: sticky;
+	left: 0;
+	z-index: 2;
+	background: var(--card-bg);
+	min-width: 200px;
+	max-width: 200px;
+	text-align: left;
+	padding: var(--padding-xs) var(--padding-sm);
+	border-right: 2px solid var(--border-color);
+}
+
+.roll-call-table thead .employee-col {
+	z-index: 3;
+	font-weight: 600;
+	background: var(--subtle-fg);
+}
+
+[data-theme="dark"] .roll-call-table thead .employee-col {
+	background: var(--gray-800);
+}
+
+/* Employee info - Avatar + Name alignment */
+.employee-info {
+	display: flex;
+	align-items: center;
+	gap: var(--padding-sm);
+}
+
+.employee-avatar {
+	flex-shrink: 0;
+	width: 28px;
+	height: 28px;
+	border-radius: 50%;
+	overflow: hidden;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.employee-avatar .avatar-img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.employee-avatar .avatar-letter {
+	width: 100%;
+	height: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--primary);
+	color: white;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.employee-name {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	font-size: var(--text-sm);
+	color: var(--text-color);
+}
+
+/* Own row highlight - subtle highlight, not full blue */
+.roll-call-table .own-row .employee-col {
+	background: var(--blue-50);
+	font-weight: 600;
+}
+
+[data-theme="dark"] .roll-call-table .own-row .employee-col {
+	background: rgba(59, 130, 246, 0.15);
+}
+
+.roll-call-table .own-row .day-cell:not(.has-entry) {
+	background: var(--blue-50);
+}
+
+[data-theme="dark"] .roll-call-table .own-row .day-cell:not(.has-entry) {
+	background: rgba(59, 130, 246, 0.08);
+}
+
+.roll-call-table .own-row .day-cell.weekend {
+	background: var(--gray-100);
+}
+
+[data-theme="dark"] .roll-call-table .own-row .day-cell.weekend {
+	background: var(--gray-800);
+}
+
+/* =====================================================
+   DAY COLUMNS
+   ===================================================== */
+
+.roll-call-table .day-col {
+	min-width: 44px;
+	max-width: 44px;
+	background: var(--subtle-fg);
+}
+
+[data-theme="dark"] .roll-call-table .day-col {
+	background: var(--gray-800);
+}
+
+.roll-call-table .day-col.weekend {
+	background: var(--gray-200);
+	color: var(--text-muted);
+}
+
+[data-theme="dark"] .roll-call-table .day-col.weekend {
+	background: var(--gray-700);
+}
+
+.day-header {
+	display: flex;
+	flex-direction: column;
+	padding: var(--padding-xs);
+}
+
+.day-header .weekday {
+	font-size: var(--text-xs);
+	color: var(--text-muted);
+	font-weight: normal;
+}
+
+.day-header .day-num {
+	font-weight: 600;
+	color: var(--heading-color);
+}
+
+/* Today indicator - blue circle on day number in header */
+.roll-call-table .day-col.today-header .day-header {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+.roll-call-table .day-col.today-header .day-num {
+	background: var(--blue-500);
+	color: white;
+	border-radius: 50%;
+	width: 22px;
+	height: 22px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-size: var(--text-sm);
+}
+
+/* =====================================================
+   WEEKEND SEPARATOR COLUMN
+   Thin grey column between weeks (like spreadsheet)
+   ===================================================== */
+
+.roll-call-table .weekend-separator {
+	width: 8px !important;
+	min-width: 8px !important;
+	max-width: 8px !important;
+	padding: 0 !important;
+	background: var(--gray-300) !important;
+	border-left: none !important;
+	border-right: none !important;
+}
+
+[data-theme="dark"] .roll-call-table .weekend-separator {
+	background: var(--gray-600) !important;
+}
+
+/* =====================================================
+   DAY CELLS
+   ===================================================== */
+
+.roll-call-table .day-cell {
+	height: 42px;
+	cursor: default;
+	transition: background-color 0.15s;
+	position: relative;
+}
+
+.roll-call-table .day-cell.editable {
+	cursor: pointer;
+}
+
+.roll-call-table .day-cell.editable:hover {
+	background-color: var(--control-bg);
+}
+
+[data-theme="dark"] .roll-call-table .day-cell.editable:hover {
+	background-color: var(--gray-700);
+}
+
+/* Weekend cells - just empty, no special styling */
+.roll-call-table .day-cell.weekend {
+	background-color: var(--gray-100);
+	cursor: default;
+}
+
+[data-theme="dark"] .roll-call-table .day-cell.weekend {
+	background-color: var(--gray-800);
+}
+
+/* Today indicator - coral left border on cells */
+.roll-call-table .day-cell.today {
+	border-left: 3px solid #F55E57 !important;
+}
+
+/* Cell selection - blue overlay + thin border (Google Sheets style) */
+.roll-call-table .day-cell.selected {
+	position: relative;
+	outline: 1px solid var(--blue-500) !important;
+	outline-offset: -1px;
+}
+
+.roll-call-table .day-cell.selected::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: rgba(2, 137, 247, 0.15);
+	pointer-events: none;
+	z-index: 1;
+}
+
+[data-theme="dark"] .roll-call-table .day-cell.selected {
+	outline: 1px solid var(--blue-400) !important;
+}
+
+[data-theme="dark"] .roll-call-table .day-cell.selected::after {
+	background: rgba(112, 182, 240, 0.25);
+}
+
+/* Cell with entry - use presence color (Frappe --bg-{color} vars auto-adapt to dark mode) */
+.roll-call-table .day-cell.has-entry {
+	background-color: var(--presence-color, var(--bg-light-gray));
+}
+
+/* =====================================================
+   LEAVE STATUS VISUAL INDICATORS
+   Striped patterns for tentative/draft leave entries
+   ===================================================== */
+
+/*
+ * Tentative (No Leave Application): Card bg + Presence Color stripes (135° diagonal)
+ * Shows "incomplete" status - needs leave application
+ */
+.roll-call-table .day-cell.has-entry.leave-tentative {
+	background-color: transparent !important;
+	background-image: repeating-linear-gradient(
+		135deg,
+		var(--card-bg),
+		var(--card-bg) 6px,
+		var(--presence-color, var(--bg-light-gray)) 6px,
+		var(--presence-color, var(--bg-light-gray)) 10px
+	) !important;
+}
+
+/*
+ * Draft (Pending Approval): Presence Color + Darker overlay stripes (135° diagonal)
+ * Shows "pending" status - leave app exists but not yet approved
+ */
+.roll-call-table .day-cell.has-entry.leave-draft {
+	background-color: transparent !important;
+	background-image: repeating-linear-gradient(
+		135deg,
+		var(--presence-color, var(--bg-light-gray)),
+		var(--presence-color, var(--bg-light-gray)) 6px,
+		rgba(0, 0, 0, 0.15) 6px,
+		rgba(0, 0, 0, 0.15) 10px
+	) !important;
+}
+
+/*
+ * Approved: Solid color (default .has-entry styling)
+ * No additional class needed - just the solid background
+ */
+
+/* Ensure presence icon remains visible on striped backgrounds */
+.roll-call-table .day-cell.leave-tentative .presence-cell,
+.roll-call-table .day-cell.leave-draft .presence-cell {
+	position: relative;
+	z-index: 1;
+}
+
+/* =====================================================
+   LEAVE SUGGESTIONS BANNER
+   Smart suggestions for creating leave applications
+   ===================================================== */
+
+.leave-suggestions-banner {
+	background: var(--yellow-50);
+	border: 1px solid var(--yellow-200);
+	border-radius: var(--border-radius-md);
+	padding: var(--padding-sm) var(--padding-md);
+	margin-bottom: var(--margin-sm);
+}
+
+[data-theme="dark"] .leave-suggestions-banner {
+	background: color-mix(in srgb, var(--yellow-900) 30%, var(--gray-800));
+	border-color: var(--yellow-700);
+}
+
+.leave-suggestions-banner .suggestions-header {
+	display: flex;
+	align-items: center;
+	gap: var(--padding-xs);
+	font-weight: 600;
+	font-size: var(--text-sm);
+	color: var(--yellow-700);
+	margin-bottom: var(--margin-xs);
+}
+
+[data-theme="dark"] .leave-suggestions-banner .suggestions-header {
+	color: var(--yellow-300);
+}
+
+.leave-suggestions-banner .suggestions-list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--padding-xs);
+}
+
+.leave-suggestion-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: var(--padding-sm);
+	padding: var(--padding-xs) 0;
+}
+
+.leave-suggestion-item .suggestion-text {
+	font-size: var(--text-sm);
+	color: var(--text-color);
+}
+
+.leave-suggestion-item .btn-create-leave-app {
+	flex-shrink: 0;
+}
+
+/* =====================================================
+   PRESENCE CELL CONTENT
+   ===================================================== */
+
+.presence-cell {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 2px;
+	height: 100%;
+	position: relative;
+}
+
+.presence-icon {
+	font-size: 18px;
+	line-height: 1;
+}
+
+.locked-badge {
+	position: absolute;
+	top: 2px;
+	right: 2px;
+	font-size: 10px;
+	opacity: 0.7;
+}
+
+.missing-indicator {
+	color: var(--orange-500);
+	font-weight: bold;
+	font-size: var(--text-lg);
+}
+
+[data-theme="dark"] .missing-indicator {
+	color: var(--orange-400);
+}
+
+/* =====================================================
+   SPLIT CELL (AM/PM)
+   ===================================================== */
+
+.roll-call-table .day-cell.split-day {
+	padding: 0;
+}
+
+.split-cell {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	width: 100%;
+}
+
+.split-am,
+.split-pm {
+	flex: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background-color: var(--presence-color, var(--bg-light-gray));
+}
+
+.split-am {
+	border-bottom: 1px solid var(--border-color);
+}
+
+.split-am .presence-icon,
+.split-pm .presence-icon {
+	font-size: 14px;
+}
+
+/* Split day leave status striped patterns */
+.split-am.leave-tentative,
+.split-pm.leave-tentative {
+	background-color: transparent !important;
+	background-image: repeating-linear-gradient(
+		135deg,
+		var(--card-bg),
+		var(--card-bg) 4px,
+		var(--presence-color, var(--bg-light-gray)) 4px,
+		var(--presence-color, var(--bg-light-gray)) 7px
+	) !important;
+}
+
+.split-am.leave-draft,
+.split-pm.leave-draft {
+	background-color: transparent !important;
+	background-image: repeating-linear-gradient(
+		135deg,
+		var(--presence-color, var(--bg-light-gray)),
+		var(--presence-color, var(--bg-light-gray)) 4px,
+		rgba(0, 0, 0, 0.15) 4px,
+		rgba(0, 0, 0, 0.15) 7px
+	) !important;
+}
+
+/* =====================================================
+   LEGEND
+   ===================================================== */
+
+.roll-call-legend {
+	margin-top: var(--margin-md);
+	padding: var(--padding-md);
+	background: var(--subtle-fg);
+	border-radius: var(--border-radius-md);
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--margin-lg);
+}
+
+[data-theme="dark"] .roll-call-legend {
+	background: var(--gray-800);
+}
+
+.legend-section {
+	display: flex;
+	align-items: center;
+	gap: var(--padding-sm);
+	flex-wrap: wrap;
+}
+
+.legend-title {
+	font-weight: 600;
+	color: var(--text-muted);
+	font-size: var(--text-sm);
+}
+
+.legend-items {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--padding-sm);
+}
+
+.legend-item {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 4px 10px;
+	border-radius: var(--border-radius);
+	font-size: var(--text-sm);
+	background: var(--item-color, var(--bg-light-gray));
+}
+
+.legend-icon {
+	font-size: 14px;
+}
+
+.legend-label {
+	color: var(--text-color);
+}
+
+/* =====================================================
+   PRESENCE DIALOG - REDESIGNED
+   ===================================================== */
+
+/* Container */
+.presence-dialog-redesign {
+	padding: 0;
+}
+
+/* Header - Employee + Date | Split Day checkbox */
+.presence-dialog-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding-bottom: var(--padding-sm);
+	margin-bottom: var(--padding-md);
+	border-bottom: 1px solid var(--border-color);
+}
+
+.presence-dialog-header .header-info {
+	font-size: var(--text-base);
+}
+
+.presence-dialog-header .header-toggle {
+	flex-shrink: 0;
+}
+
+.presence-dialog-header .split-day-label {
+	display: flex;
+	align-items: center;
+	gap: var(--padding-xs);
+	cursor: pointer;
+	font-size: var(--text-sm);
+	color: var(--text-muted);
+}
+
+.presence-dialog-header .split-day-check {
+	width: 16px;
+	height: 16px;
+	cursor: pointer;
+}
+
+/* Category sections */
+.presence-category {
+	margin-bottom: var(--padding-md);
+}
+
+.presence-category:last-child {
+	margin-bottom: 0;
+}
+
+.category-title {
+	font-weight: 600;
+	font-size: var(--text-xs);
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	color: var(--text-muted);
+	margin-bottom: var(--padding-sm);
+}
+
+.category-title-small {
+	font-weight: 600;
+	font-size: 10px;
+	text-transform: uppercase;
+	letter-spacing: 0.3px;
+	color: var(--text-muted);
+	margin-bottom: var(--padding-xs);
+}
+
+.category-divider {
+	height: 1px;
+	background: var(--border-color);
+	margin: var(--padding-md) 0;
+}
+
+/* Category options grid */
+.category-options {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+	gap: var(--padding-md);
+}
+
+/* Split Day Mode */
+.split-day-selector .split-warning {
+	display: flex;
+	align-items: center;
+	gap: var(--padding-xs);
+	padding: var(--padding-xs) var(--padding-sm);
+	background: var(--yellow-100);
+	border-radius: var(--border-radius);
+	font-size: var(--text-xs);
+	color: var(--yellow-700);
+	margin-bottom: var(--padding-md);
+}
+
+[data-theme="dark"] .split-day-selector .split-warning {
+	background: color-mix(in srgb, var(--yellow-900) 40%, var(--gray-800));
+	color: var(--yellow-300);
+}
+
+.split-columns {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: var(--padding-md);
+}
+
+.split-column {
+	padding: var(--padding-md);
+	background: transparent;
+	border-radius: var(--border-radius-md);
+}
+
+.split-column .column-header {
+	font-weight: 600;
+	font-size: var(--text-base);
+	text-align: center;
+	margin-bottom: var(--padding-sm);
+	padding-bottom: var(--padding-xs);
+	border-bottom: 1px solid var(--border-color);
+	color: var(--heading-color);
+}
+
+/* Split column has smaller options grid */
+.split-column .category-options {
+	grid-template-columns: 1fr;
+}
+
+.split-column .presence-option {
+	padding: var(--padding-xs) var(--padding-sm);
+}
+
+.split-column .option-icon {
+	font-size: 14px;
+}
+
+.split-column .option-label {
+	font-size: var(--text-xs);
+}
+
+/* Disabled state for not-working options in split mode */
+.presence-option.disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
+	pointer-events: none;
+}
+
+/* Legacy dialog info (kept for compatibility) */
+.presence-dialog-info {
+	margin-bottom: var(--margin-md);
+	padding-bottom: var(--padding-sm);
+	border-bottom: 1px solid var(--border-color);
+}
+
+/* Day mode toggle (Full Day / AM-PM) */
+.day-mode-toggle {
+	display: flex;
+	gap: var(--padding-xs);
+	margin-bottom: var(--margin-md);
+	padding: var(--padding-xs);
+	background: var(--gray-100);
+	border-radius: var(--border-radius);
+}
+
+[data-theme="dark"] .day-mode-toggle {
+	background: var(--gray-800);
+}
+
+.day-mode-toggle .mode-btn {
+	flex: 1;
+	border: none;
+	background: transparent;
+	color: var(--text-muted);
+	font-weight: 500;
+}
+
+.day-mode-toggle .mode-btn.active {
+	background: var(--card-bg);
+	color: var(--text-color);
+	box-shadow: var(--shadow-sm);
+}
+
+[data-theme="dark"] .day-mode-toggle .mode-btn.active {
+	background: var(--gray-700);
+}
+
+/* Split day selector */
+.split-section {
+	margin-bottom: var(--margin-md);
+	padding: var(--padding-sm);
+	background: var(--gray-50);
+	border-radius: var(--border-radius);
+}
+
+[data-theme="dark"] .split-section {
+	background: var(--gray-900);
+}
+
+.split-label {
+	font-weight: 600;
+	font-size: var(--text-sm);
+	margin-bottom: var(--margin-sm);
+	color: var(--text-color);
+}
+
+.presence-selector {
+	display: flex;
+	flex-direction: column;
+	gap: var(--margin-md);
+}
+
+.presence-group {
+	margin-bottom: var(--margin-sm);
+}
+
+.presence-group-title {
+	font-weight: 600;
+	color: var(--text-muted);
+	font-size: var(--text-xs);
+	text-transform: uppercase;
+	margin-bottom: var(--margin-sm);
+}
+
+.presence-options {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+	gap: var(--padding-sm);
+}
+
+.presence-option {
+	display: flex;
+	align-items: center;
+	gap: var(--padding-sm);
+	padding: var(--padding-sm) var(--padding-md);
+	border: 2px solid var(--border-color);
+	border-radius: var(--border-radius-md);
+	cursor: pointer;
+	transition: all 0.15s ease;
+	background: var(--option-color, var(--card-bg));
+}
+
+.presence-option:hover {
+	border-color: var(--blue-500);
+}
+
+.presence-option.selected {
+	border-color: var(--blue-500);
+	box-shadow: 0 0 0 1px var(--blue-500);
+}
+
+.option-icon {
+	font-size: 18px;
+}
+
+.option-label {
+	font-size: var(--text-sm);
+	color: var(--text-color);
+}
+
+/* =====================================================
+   SHOW MORE TOGGLE
+   Expandable sections for extended presence options
+   ===================================================== */
+
+.show-more-toggle {
+	display: flex;
+	align-items: center;
+	gap: var(--padding-xs);
+	margin-top: var(--padding-sm);
+	margin-bottom: var(--padding-xs);
+	padding: var(--padding-xs) var(--padding-sm);
+	cursor: pointer;
+	color: var(--text-muted);
+	font-size: var(--text-sm);
+	transition: color 0.15s ease;
+	border-radius: var(--border-radius);
+}
+
+.show-more-toggle:hover {
+	color: var(--blue-500);
+	background: var(--control-bg);
+}
+
+[data-theme="dark"] .show-more-toggle:hover {
+	background: var(--gray-800);
+}
+
+.show-more-toggle .toggle-icon {
+	font-weight: 600;
+	font-size: var(--text-base);
+	width: 16px;
+	text-align: center;
+}
+
+.show-more-toggle .toggle-text {
+	font-weight: 500;
+}
+
+/* Extended options container */
+.extended-options {
+	margin-top: var(--padding-xs);
+	padding-top: var(--padding-sm);
+	border-top: 1px dashed var(--border-color);
+}
+
+/* Extended option styling - slightly muted to indicate secondary status */
+.presence-option.extended-option {
+	opacity: 0.9;
+}
+
+.presence-option.extended-option:hover {
+	opacity: 1;
+}
+
+/* Toolbar responsive styles are in the RESPONSIVE STYLES section below */
+
+
+/* =====================================================
+   FLEXITIME DASHBOARD STYLES
+   ===================================================== */
+
+.flexitime-dashboard {
+	padding: var(--padding-md);
+}
+
+.dashboard-section {
+	background: var(--card-bg);
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius-md);
+	padding: var(--padding-lg);
+	height: 100%;
+}
+
+.dashboard-section h5 {
+	margin-bottom: var(--padding-md);
+	padding-bottom: var(--padding-sm);
+	border-bottom: 1px solid var(--border-color);
+	font-weight: 600;
+	color: var(--heading-color);
+}
+
+/* Today's Overview */
+.today-overview {
+	background: linear-gradient(135deg, var(--primary) 0%, var(--purple-500) 100%);
+	color: white;
+}
+
+.today-overview h5 {
+	color: white;
+	border-bottom-color: rgba(255, 255, 255, 0.2);
+}
+
+.overview-stats {
+	display: flex;
+	flex-direction: column;
+	gap: var(--padding-md);
+}
+
+.today-date {
+	font-size: var(--text-xl);
+	font-weight: 600;
+}
+
+.stat-items {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--padding-md);
+}
+
+.stat-item {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--padding-xs);
+	font-size: var(--text-base);
+	background: rgba(255, 255, 255, 0.15);
+	padding: var(--padding-sm) var(--padding-md);
+	border-radius: var(--border-radius-md);
+}
+
+.stat-item strong {
+	font-size: var(--text-lg);
+}
+
+/* Tables */
+.dashboard-section .table {
+	margin-bottom: 0;
+	font-size: var(--text-sm);
+}
+
+.dashboard-section .table th {
+	border-top: none;
+	font-weight: 600;
+	color: var(--text-muted);
+	background: var(--subtle-fg);
+}
+
+.dashboard-section .table td {
+	vertical-align: middle;
+	color: var(--text-color);
+}
+
+/* Balance alerts */
+.balance-alerts .text-danger {
+	font-weight: 600;
+}
+
+.balance-alerts .text-warning {
+	font-weight: 500;
+}
+
+/* Action buttons */
+.dashboard-section .btn-xs {
+	padding: 2px 8px;
+	font-size: var(--text-xs);
+}
+
+
+/* =====================================================
+   RESPONSIVE STYLES
+   ===================================================== */
+
+@media (max-width: 768px) {
+	.roll-call-table .employee-col {
+		min-width: 140px;
+		max-width: 140px;
+	}
+
+	.employee-avatar {
+		width: 24px;
+		height: 24px;
+	}
+
+	.employee-avatar .avatar-letter {
+		font-size: 10px;
+	}
+
+	.employee-name {
+		font-size: var(--text-xs);
+	}
+
+	.roll-call-table .day-col {
+		min-width: 36px;
+		max-width: 36px;
+	}
+
+	.roll-call-table .day-cell {
+		height: 36px;
+	}
+
+	.presence-icon {
+		font-size: 14px;
+	}
+
+	.presence-options {
+		grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+	}
+
+	.dashboard-section {
+		margin-bottom: var(--padding-md);
+	}
+
+	.stat-items {
+		gap: var(--padding-sm);
+	}
+
+	.stat-item {
+		font-size: var(--text-sm);
+		padding: var(--padding-xs) var(--padding-sm);
+	}
+
+	/* Roll Call Toolbar responsive */
+	.roll-call-toolbar .toolbar-row {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.roll-call-toolbar .toolbar-nav {
+		justify-content: center;
+	}
+
+	.roll-call-toolbar .toolbar-options {
+		justify-content: center;
+		margin-top: var(--padding-sm);
+	}
+
+	.roll-call-toolbar .toolbar-filters {
+		justify-content: center;
+	}
+
+	.selection-toolbar {
+		flex-wrap: wrap;
+		gap: var(--padding-sm);
+	}
+}

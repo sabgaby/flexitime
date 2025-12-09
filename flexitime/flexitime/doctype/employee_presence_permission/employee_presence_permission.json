@@ -1,0 +1,63 @@
+{
+ "actions": [],
+ "creation": "2025-01-01 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "presence_type",
+  "presence_type_label",
+  "column_break_dates",
+  "from_date",
+  "to_date"
+ ],
+ "fields": [
+  {
+   "fieldname": "presence_type",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Presence Type",
+   "options": "Presence Type",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "presence_type.label",
+   "fieldname": "presence_type_label",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Label",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_dates",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Leave blank for always available",
+   "fieldname": "from_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "From Date"
+  },
+  {
+   "description": "Leave blank for no end date",
+   "fieldname": "to_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "To Date"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-01-01 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Flexitime",
+ "name": "Employee Presence Permission",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

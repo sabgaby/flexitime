@@ -1,0 +1,51 @@
+[
+  {
+    "doctype": "Email Template",
+    "name": "Roll Call Reminder",
+    "subject": "Please fill in your roll call for next week",
+    "response": "<p>Dear {{ employee_name }},</p>\n\n<p>This is a reminder to fill in your roll call for the week of <strong>{{ week_start }}</strong> to <strong>{{ week_end }}</strong>.</p>\n\n<p>You are missing entries for: <strong>{{ missing_days }}</strong></p>\n\n<p><a href=\"{{ roll_call_url }}\" style=\"display: inline-block; padding: 10px 20px; background-color: #2490ef; color: white; text-decoration: none; border-radius: 5px;\">Fill Roll Call</a></p>\n\n<p>Thank you!</p>",
+    "use_html": 1
+  },
+  {
+    "doctype": "Email Template",
+    "name": "Timesheet Reminder",
+    "subject": "Please submit your timesheet for this week",
+    "response": "<p>Dear {{ employee_name }},</p>\n\n<p>This is a reminder to submit your timesheet for the week of <strong>{{ week_start }}</strong> to <strong>{{ week_end }}</strong>.</p>\n\n{% if status == 'Draft' %}\n<p>Current status: <strong>Draft</strong> ({{ hours_logged }} hours logged)</p>\n{% else %}\n<p>Your timesheet has not been started yet.</p>\n{% endif %}\n\n<p><a href=\"{{ weekly_entry_url }}\" style=\"display: inline-block; padding: 10px 20px; background-color: #2490ef; color: white; text-decoration: none; border-radius: 5px;\">Submit Timesheet</a></p>\n\n<p>Thank you!</p>",
+    "use_html": 1
+  },
+  {
+    "doctype": "Email Template",
+    "name": "Missing Timesheet Alert",
+    "subject": "Missing timesheet for week of {{ week_start }}",
+    "response": "<p>Dear {{ employee_name }},</p>\n\n<p><strong>Urgent:</strong> Your timesheet for the week of <strong>{{ week_start }}</strong> to <strong>{{ week_end }}</strong> has not been submitted.</p>\n\n<p>Please submit your timesheet as soon as possible to maintain accurate records.</p>\n\n<p>Thank you!</p>",
+    "use_html": 1
+  },
+  {
+    "doctype": "Email Template",
+    "name": "HR Missing Timesheet Summary",
+    "subject": "{{ missing_count }} employees missing timesheets",
+    "response": "<p>The following employees have not submitted their timesheets for the week of <strong>{{ week_start }}</strong>:</p>\n\n<table style=\"border-collapse: collapse; width: 100%;\">\n<tr style=\"background-color: #f5f5f5;\">\n<th style=\"border: 1px solid #ddd; padding: 8px; text-align: left;\">Employee</th>\n<th style=\"border: 1px solid #ddd; padding: 8px; text-align: left;\">Status</th>\n</tr>\n{% for emp in missing_employees %}\n<tr>\n<td style=\"border: 1px solid #ddd; padding: 8px;\">{{ emp.employee_name }}</td>\n<td style=\"border: 1px solid #ddd; padding: 8px;\">{{ emp.status }}</td>\n</tr>\n{% endfor %}\n</table>",
+    "use_html": 1
+  },
+  {
+    "doctype": "Email Template",
+    "name": "Balance Over Limit",
+    "subject": "Your flexitime balance exceeds the limit",
+    "response": "<p>Dear {{ employee_name }},</p>\n\n<p>Your flexitime balance has exceeded the allowed limit.</p>\n\n<p>Current balance: <strong>{{ '+' if balance >= 0 else '' }}{{ balance }}h</strong><br>\nAllowed limit: <strong>\u00b1{{ limit }}h</strong><br>\nOver by: <strong>{{ over_by }}h</strong></p>\n\n<p>Please speak with your manager or HR to address this balance.</p>\n\n<p>Thank you!</p>",
+    "use_html": 1
+  },
+  {
+    "doctype": "Email Template",
+    "name": "Balance Warning",
+    "subject": "Your flexitime balance is approaching the limit",
+    "response": "<p>Dear {{ employee_name }},</p>\n\n<p>Your flexitime balance is approaching the allowed limit.</p>\n\n<p>Current balance: <strong>{{ '+' if balance >= 0 else '' }}{{ balance }}h</strong><br>\nAllowed limit: <strong>\u00b1{{ limit }}h</strong><br>\nYou are at <strong>{{ percentage }}%</strong> of your limit.</p>\n\n<p>Please be mindful of your hours worked to stay within the limit.</p>\n\n<p>Thank you!</p>",
+    "use_html": 1
+  },
+  {
+    "doctype": "Email Template",
+    "name": "HR Balance Alerts Summary",
+    "subject": "Flexitime balance alerts",
+    "response": "<p>The following employees have flexitime balance alerts:</p>\n\n<table style=\"border-collapse: collapse; width: 100%;\">\n<tr style=\"background-color: #f5f5f5;\">\n<th style=\"border: 1px solid #ddd; padding: 8px; text-align: left;\">Employee</th>\n<th style=\"border: 1px solid #ddd; padding: 8px; text-align: left;\">Balance</th>\n<th style=\"border: 1px solid #ddd; padding: 8px; text-align: left;\">Limit</th>\n<th style=\"border: 1px solid #ddd; padding: 8px; text-align: left;\">Status</th>\n</tr>\n{% for alert in alerts %}\n<tr>\n<td style=\"border: 1px solid #ddd; padding: 8px;\">{{ alert.employee_name }}</td>\n<td style=\"border: 1px solid #ddd; padding: 8px;\">{{ '+' if alert.balance >= 0 else '' }}{{ alert.balance }}h</td>\n<td style=\"border: 1px solid #ddd; padding: 8px;\">\u00b1{{ alert.limit }}h</td>\n<td style=\"border: 1px solid #ddd; padding: 8px; color: {% if alert.status == 'over' %}#dc3545{% else %}#ffc107{% endif %};\">{{ 'Over limit' if alert.status == 'over' else 'Warning' }}</td>\n</tr>\n{% endfor %}\n</table>",
+    "use_html": 1
+  }
+]

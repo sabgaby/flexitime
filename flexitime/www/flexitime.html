@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no"
+		/>
+		<title>Flexitime - Roll Call</title>
+
+		<!-- PWA Meta Tags -->
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-title" content="Flexitime" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+		<meta name="theme-color" content="#4f46e5" />
+		<meta name="description" content="Track your presence and flexitime balance" />
+
+		<!-- Favicon -->
+		<link rel="icon" type="image/svg+xml" href="/assets/flexitime/icons/icon.svg" />
+		<link rel="apple-touch-icon" href="/assets/flexitime/icons/apple-touch-icon.png" />
+
+		<!-- PWA Manifest -->
+		<link rel="manifest" href="/assets/flexitime/manifest.json" />
+
+		<!-- Preconnect -->
+		<link rel="preconnect" href="/" />
+
+		<!-- CSRF Token -->
+		<script>
+			window.csrf_token = "{{ csrf_token }}";
+			window.site_name = "{{ site_name }}";
+			window.is_guest = {{ "true" if is_guest else "false" }};
+		</script>
+
+		<!-- Styles will be injected by Vite -->
+	</head>
+	<body>
+		<div id="app"></div>
+
+		<!-- In production, these are replaced by built assets -->
+		{% if frappe.conf.developer_mode %}
+		<script type="module" src="http://localhost:8080/src/main.js"></script>
+		{% else %}
+		<script type="module" src="/assets/flexitime/frontend/main.js"></script>
+		<link rel="stylesheet" href="/assets/flexitime/frontend/main.css" />
+		{% endif %}
+	</body>
+</html>

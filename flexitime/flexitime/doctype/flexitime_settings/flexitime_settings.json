@@ -1,0 +1,103 @@
+{
+ "actions": [],
+ "creation": "2025-01-01 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "auto_lock_section",
+  "enable_auto_lock",
+  "auto_lock_after_days",
+  "column_break_lock",
+  "reminder_section",
+  "enable_submission_reminders",
+  "submission_reminder_day",
+  "column_break_reminder",
+  "reminder_email_template"
+ ],
+ "fields": [
+  {
+   "fieldname": "auto_lock_section",
+   "fieldtype": "Section Break",
+   "label": "Auto-Lock Settings"
+  },
+  {
+   "default": "1",
+   "description": "Automatically lock submitted Weekly Entries after a specified number of days",
+   "fieldname": "enable_auto_lock",
+   "fieldtype": "Check",
+   "label": "Enable Auto-Lock"
+  },
+  {
+   "default": "14",
+   "depends_on": "enable_auto_lock",
+   "description": "Number of days after submission before auto-locking",
+   "fieldname": "auto_lock_after_days",
+   "fieldtype": "Int",
+   "label": "Auto-Lock After (Days)"
+  },
+  {
+   "fieldname": "column_break_lock",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "reminder_section",
+   "fieldtype": "Section Break",
+   "label": "Submission Reminders"
+  },
+  {
+   "default": "1",
+   "description": "Send email reminders to employees who haven't submitted their Weekly Entry",
+   "fieldname": "enable_submission_reminders",
+   "fieldtype": "Check",
+   "label": "Enable Submission Reminders"
+  },
+  {
+   "default": "Monday",
+   "depends_on": "enable_submission_reminders",
+   "description": "Day of week to send submission reminders",
+   "fieldname": "submission_reminder_day",
+   "fieldtype": "Select",
+   "label": "Reminder Day",
+   "options": "Monday\nTuesday\nWednesday\nThursday\nFriday\nSaturday\nSunday"
+  },
+  {
+   "fieldname": "column_break_reminder",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "enable_submission_reminders",
+   "description": "Email template for submission reminders (optional)",
+   "fieldname": "reminder_email_template",
+   "fieldtype": "Link",
+   "label": "Reminder Email Template",
+   "options": "Email Template"
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2025-01-01 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Flexitime",
+ "name": "Flexitime Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "HR Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "System Manager"
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

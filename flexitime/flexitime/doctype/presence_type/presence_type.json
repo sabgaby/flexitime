@@ -1,0 +1,196 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:presence_name",
+ "creation": "2025-01-01 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "presence_name",
+  "label",
+  "icon",
+  "column_break_basic",
+  "category",
+  "parent_presence_type",
+  "sort_order",
+  "section_break_settings",
+  "available_to_all",
+  "requires_pattern_match",
+  "show_in_quick_dialog",
+  "column_break_settings",
+  "is_system",
+  "is_leave",
+  "requires_leave_application",
+  "leave_type",
+  "deducts_from_flextime_balance",
+  "section_break_display",
+  "color",
+  "description"
+ ],
+ "fields": [
+  {
+   "fieldname": "presence_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Presence Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "label",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Label",
+   "reqd": 1
+  },
+  {
+   "fieldname": "icon",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Icon",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_basic",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "category",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Category",
+   "options": "Working\nScheduled\nLeave",
+   "reqd": 1
+  },
+  {
+   "fieldname": "parent_presence_type",
+   "fieldtype": "Link",
+   "label": "Parent Presence Type",
+   "options": "Presence Type"
+  },
+  {
+   "default": "0",
+   "fieldname": "sort_order",
+   "fieldtype": "Int",
+   "label": "Sort Order"
+  },
+  {
+   "fieldname": "section_break_settings",
+   "fieldtype": "Section Break",
+   "label": "Settings"
+  },
+  {
+   "default": "1",
+   "description": "All employees can select this presence type",
+   "fieldname": "available_to_all",
+   "fieldtype": "Check",
+   "label": "Available to All"
+  },
+  {
+   "default": "0",
+   "description": "Only available if Work Pattern shows 0 expected hours for that day",
+   "fieldname": "requires_pattern_match",
+   "fieldtype": "Check",
+   "label": "Requires Pattern Match"
+  },
+  {
+   "default": "1",
+   "description": "Show in main dialog. If unchecked, appears under 'Show more'",
+   "fieldname": "show_in_quick_dialog",
+   "fieldtype": "Check",
+   "label": "Show in Quick Dialog"
+  },
+  {
+   "fieldname": "column_break_settings",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "System-managed, not user-selectable (weekend, holiday)",
+   "fieldname": "is_system",
+   "fieldtype": "Check",
+   "label": "Is System Type"
+  },
+  {
+   "default": "0",
+   "description": "Maps to ERPNext Leave Application",
+   "fieldname": "is_leave",
+   "fieldtype": "Check",
+   "label": "Is Leave Type"
+  },
+  {
+   "default": "0",
+   "description": "When checked, this presence type requires a Leave Application for approval. Use for leave types, remote work requiring approval, training, etc.",
+   "fieldname": "requires_leave_application",
+   "fieldtype": "Check",
+   "label": "Requires Leave Application"
+  },
+  {
+   "depends_on": "eval:doc.requires_leave_application",
+   "fieldname": "leave_type",
+   "fieldtype": "Link",
+   "label": "Leave Type",
+   "mandatory_depends_on": "eval:doc.requires_leave_application",
+   "options": "Leave Type"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.requires_leave_application",
+   "description": "Expected hours stay at Work Pattern value instead of 0. Use for Flex Off to deduct from balance.",
+   "fieldname": "deducts_from_flextime_balance",
+   "fieldtype": "Check",
+   "label": "Deducts from Flextime Balance"
+  },
+  {
+   "fieldname": "section_break_display",
+   "fieldtype": "Section Break",
+   "label": "Display"
+  },
+  {
+   "description": "Background color for grid display. Uses Frappe UI colors for light/dark mode support.",
+   "fieldname": "color",
+   "fieldtype": "Select",
+   "label": "Color",
+   "options": "\nblue\ngreen\norange\nyellow\nred\npurple\npink\ncyan\ngray"
+  },
+  {
+   "description": "Help text for employees",
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  }
+ ],
+ "links": [],
+ "modified": "2025-01-01 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Flexitime",
+ "name": "Presence Type",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Employee"
+  }
+ ],
+ "sort_field": "sort_order",
+ "sort_order": "ASC",
+ "states": [],
+ "track_changes": 1
+}

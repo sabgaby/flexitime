@@ -1,0 +1,237 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "format:{employee}-{week_start}",
+ "creation": "2025-01-01 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "is_submittable": 1,
+ "field_order": [
+  "employee",
+  "employee_name",
+  "column_break_main",
+  "week_start",
+  "week_end",
+  "section_break_entries",
+  "daily_entries",
+  "section_break_totals",
+  "total_actual_hours",
+  "total_expected_hours",
+  "weekly_delta",
+  "column_break_totals",
+  "timesheet_hours",
+  "section_break_balance",
+  "previous_balance",
+  "column_break_balance",
+  "running_balance",
+  "section_break_notes",
+  "notes",
+  "section_break_admin",
+  "is_locked",
+  "submitted_on",
+  "locked_on",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Employee",
+   "options": "Employee",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "employee.employee_name",
+   "fieldname": "employee_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Employee Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "week_start",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Week Start (Monday)",
+   "reqd": 1
+  },
+  {
+   "fieldname": "week_end",
+   "fieldtype": "Date",
+   "label": "Week End (Sunday)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_entries",
+   "fieldtype": "Section Break",
+   "label": "Daily Entries"
+  },
+  {
+   "cannot_add_rows": 1,
+   "cannot_delete_rows": 1,
+   "fieldname": "daily_entries",
+   "fieldtype": "Table",
+   "label": "Daily Entries",
+   "options": "Daily Entry"
+  },
+  {
+   "fieldname": "section_break_totals",
+   "fieldtype": "Section Break",
+   "label": "Weekly Totals"
+  },
+  {
+   "description": "Sum of all daily actual hours",
+   "fieldname": "total_actual_hours",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Total Actual Hours",
+   "precision": "1",
+   "read_only": 1
+  },
+  {
+   "description": "Sum of all daily expected hours",
+   "fieldname": "total_expected_hours",
+   "fieldtype": "Float",
+   "label": "Total Expected Hours",
+   "precision": "1",
+   "read_only": 1
+  },
+  {
+   "description": "Actual - Expected",
+   "fieldname": "weekly_delta",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Weekly Delta",
+   "precision": "1",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_totals",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Hours pulled from Timesheets",
+   "fieldname": "timesheet_hours",
+   "fieldtype": "Float",
+   "hidden": 1,
+   "label": "Timesheet Hours",
+   "precision": "1",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_balance",
+   "fieldtype": "Section Break",
+   "label": "Flexitime Balance"
+  },
+  {
+   "description": "Balance from prior week",
+   "fieldname": "previous_balance",
+   "fieldtype": "Float",
+   "label": "Previous Balance",
+   "precision": "1",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_balance",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Previous + Delta",
+   "fieldname": "running_balance",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Running Balance",
+   "precision": "1",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_notes",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_admin",
+   "fieldtype": "Section Break",
+   "label": "Administration"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_locked",
+   "fieldtype": "Check",
+   "label": "Locked",
+   "read_only": 1
+  },
+  {
+   "fieldname": "submitted_on",
+   "fieldtype": "Datetime",
+   "label": "Submitted On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "locked_on",
+   "fieldtype": "Datetime",
+   "label": "Locked On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Weekly Entry",
+   "print_hide": 1,
+   "read_only": 1
+  }
+ ],
+ "links": [],
+ "modified": "2025-01-01 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Flexitime",
+ "name": "Weekly Entry",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Employee",
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "week_start",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

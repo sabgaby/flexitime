@@ -1,0 +1,152 @@
+/* Flexitime Dashboard Styles */
+
+.flexitime-dashboard {
+	padding: 15px;
+}
+
+/* Frappe Card Styling */
+.frappe-card {
+	background: var(--card-bg);
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius-lg);
+	padding: 0;
+	height: 100%;
+	margin-bottom: 15px;
+}
+
+.frappe-card .card-head {
+	padding: 15px 20px;
+	border-bottom: 1px solid var(--border-color);
+}
+
+.frappe-card .card-head-title {
+	font-weight: 600;
+	font-size: var(--text-base);
+	color: var(--heading-color);
+}
+
+.frappe-card .card-body {
+	padding: 15px 20px;
+}
+
+/* Number Cards */
+.number-card {
+	background: var(--card-bg);
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius-lg);
+	padding: 20px;
+	text-align: center;
+	transition: box-shadow 0.2s ease;
+}
+
+.number-card:hover {
+	box-shadow: var(--shadow-sm);
+}
+
+.number-card-value {
+	font-size: 2.5rem;
+	font-weight: 700;
+	color: var(--heading-color);
+	line-height: 1.2;
+}
+
+.number-card-label {
+	font-size: var(--text-sm);
+	color: var(--text-muted);
+	margin-top: 5px;
+}
+
+/* List Group styling */
+.list-group-flush .list-group-item {
+	background: transparent;
+	border-left: 0;
+	border-right: 0;
+	border-top: 0;
+	border-bottom: 1px solid var(--border-color);
+	padding: 12px 0;
+}
+
+.list-group-flush .list-group-item:last-child {
+	border-bottom: 0;
+}
+
+/* Indicator Pills */
+.indicator-pill {
+	display: inline-block;
+	padding: 2px 8px;
+	border-radius: var(--border-radius);
+	font-size: var(--text-xs);
+	font-weight: 500;
+}
+
+.indicator-pill.red {
+	background: var(--red-100);
+	color: var(--red-600);
+}
+
+.indicator-pill.orange {
+	background: var(--orange-100);
+	color: var(--orange-600);
+}
+
+.indicator-pill.green {
+	background: var(--green-100);
+	color: var(--green-600);
+}
+
+.indicator-pill.blue {
+	background: var(--blue-100);
+	color: var(--blue-600);
+}
+
+.indicator-pill.grey {
+	background: var(--gray-100);
+	color: var(--gray-600);
+}
+
+/* Badge styling */
+.badge-secondary {
+	background: var(--gray-200);
+	color: var(--gray-700);
+}
+
+/* Chart container */
+.chart-container .frappe-card {
+	min-height: 280px;
+}
+
+/* Action buttons */
+.btn-xs {
+	padding: 4px 10px;
+	font-size: var(--text-xs);
+}
+
+/* Empty state text */
+.text-muted {
+	color: var(--text-muted) !important;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+	.frappe-card {
+		margin-bottom: 15px;
+	}
+
+	.number-card {
+		padding: 15px;
+	}
+
+	.number-card-value {
+		font-size: 2rem;
+	}
+
+	.list-group-item {
+		flex-direction: column;
+		align-items: flex-start !important;
+		gap: 10px;
+	}
+
+	.list-group-item .btn {
+		align-self: flex-end;
+	}
+}

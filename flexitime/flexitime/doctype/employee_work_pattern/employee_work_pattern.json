@@ -1,0 +1,213 @@
+{
+ "actions": [],
+ "autoname": "format:{employee}-{valid_from}",
+ "creation": "2025-01-01 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "employee",
+  "employee_name",
+  "column_break_emp",
+  "fte_percentage",
+  "flexitime_limit_hours",
+  "section_break_schedule",
+  "monday_hours",
+  "tuesday_hours",
+  "wednesday_hours",
+  "thursday_hours",
+  "column_break_schedule",
+  "friday_hours",
+  "saturday_hours",
+  "sunday_hours",
+  "weekly_expected_hours",
+  "section_break_validity",
+  "valid_from",
+  "column_break_validity",
+  "valid_to",
+  "section_break_notes",
+  "notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Employee",
+   "options": "Employee",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "employee.employee_name",
+   "fieldname": "employee_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Employee Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_emp",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "100",
+   "description": "Full-time equivalent percentage (e.g., 100, 80, 60)",
+   "fieldname": "fte_percentage",
+   "fieldtype": "Percent",
+   "in_list_view": 1,
+   "label": "FTE Percentage",
+   "reqd": 1
+  },
+  {
+   "description": "Maximum +/- balance (auto-calculated: 20 x FTE%)",
+   "fieldname": "flexitime_limit_hours",
+   "fieldtype": "Float",
+   "label": "Flexitime Limit Hours",
+   "precision": "1",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_schedule",
+   "fieldtype": "Section Break",
+   "label": "Weekly Schedule"
+  },
+  {
+   "default": "8",
+   "fieldname": "monday_hours",
+   "fieldtype": "Float",
+   "label": "Monday Hours",
+   "precision": "1",
+   "reqd": 1
+  },
+  {
+   "default": "8",
+   "fieldname": "tuesday_hours",
+   "fieldtype": "Float",
+   "label": "Tuesday Hours",
+   "precision": "1",
+   "reqd": 1
+  },
+  {
+   "default": "8",
+   "fieldname": "wednesday_hours",
+   "fieldtype": "Float",
+   "label": "Wednesday Hours",
+   "precision": "1",
+   "reqd": 1
+  },
+  {
+   "default": "8",
+   "fieldname": "thursday_hours",
+   "fieldtype": "Float",
+   "label": "Thursday Hours",
+   "precision": "1",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_schedule",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "8",
+   "fieldname": "friday_hours",
+   "fieldtype": "Float",
+   "label": "Friday Hours",
+   "precision": "1",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "saturday_hours",
+   "fieldtype": "Float",
+   "label": "Saturday Hours",
+   "precision": "1",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "sunday_hours",
+   "fieldtype": "Float",
+   "label": "Sunday Hours",
+   "precision": "1",
+   "reqd": 1
+  },
+  {
+   "description": "Auto-calculated sum of all days",
+   "fieldname": "weekly_expected_hours",
+   "fieldtype": "Float",
+   "label": "Weekly Expected Hours",
+   "precision": "1",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_validity",
+   "fieldtype": "Section Break",
+   "label": "Validity Period"
+  },
+  {
+   "fieldname": "valid_from",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Valid From",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_validity",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "description": "Leave empty if this is the current pattern",
+   "fieldname": "valid_to",
+   "fieldtype": "Date",
+   "label": "Valid To"
+  },
+  {
+   "fieldname": "section_break_notes",
+   "fieldtype": "Section Break"
+  },
+  {
+   "description": "Reason for pattern or change",
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "links": [],
+ "modified": "2025-01-01 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Flexitime",
+ "name": "Employee Work Pattern",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR Manager",
+   "share": 1,
+   "submit": 1,
+   "cancel": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Employee",
+   "if_owner": 1
+  }
+ ],
+ "sort_field": "valid_from",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1,
+ "is_submittable": 1
+}
