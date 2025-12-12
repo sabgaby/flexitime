@@ -27,7 +27,9 @@
   "pm_presence_icon",
   "section_break_status",
   "is_locked",
-  "notes"
+  "notes",
+  "previous_source",
+  "previous_presence_type"
  ],
  "fields": [
   {
@@ -182,6 +184,21 @@
    "fieldname": "notes",
    "fieldtype": "Small Text",
    "label": "Notes"
+  },
+  {
+   "fieldname": "previous_source",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Previous Source",
+   "description": "Stores original source before leave overwrite for restore on cancellation"
+  },
+  {
+   "fieldname": "previous_presence_type",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Previous Presence Type",
+   "options": "Presence Type",
+   "description": "Stores original presence type before leave overwrite for restore on cancellation"
   }
  ],
  "links": [],

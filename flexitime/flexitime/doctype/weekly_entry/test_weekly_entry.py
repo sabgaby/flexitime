@@ -400,3 +400,235 @@ class TestWeeklyEntryExpectedHours(IntegrationTestCase):
 
 		expected = calculate_expected_hours(self.employee.name, monday, None)
 		self.assertEqual(expected, 0)
+
+
+class TestWeeklyExpectedHoursWithLeaves(IntegrationTestCase):
+	"""Test weekly expected hours calculation with leaves and holidays"""
+	
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		frappe.set_user("Administrator")
+		cls.presence_types = create_test_presence_types()
+		cls.employee = create_test_employee("_Test Weekly Entry Employee Leaves")
+		cls.work_pattern = create_test_work_pattern(cls.employee.name)
+		
+		# Set base weekly hours to 40 in Company
+		company = frappe.db.get_value("Employee", cls.employee.name, "company")
+		if company:
+			frappe.db.set_value("Company", company, "base_weekly_hours", 40)
+			frappe.db.commit()
+	
+	@classmethod
+	def tearDownClass(cls):
+		cleanup_test_data()
+		super().tearDownClass()
+	
+	def setUp(self):
+		# Clean up entries before each test
+		frappe.db.sql("""
+			DELETE FROM `tabWeekly Entry`
+			WHERE employee = %s
+		""", (self.employee.name,))
+		frappe.db.sql("""
+			DELETE FROM `tabRoll Call Entry`
+			WHERE employee = %s
+		""", (self.employee.name,))
+		frappe.db.sql("""
+			DELETE FROM `tabLeave Application`
+			WHERE employee = %s
+		""", (self.employee.name,))
+		frappe.db.commit()
+	
+	def test_100_percent_fte_regular_leave_reduces_expected(self):
+		"""Test that 100% FTE with 1 regular leave day reduces weekly expected by daily_avg"""
+		from flexitime.flexitime.utils import calculate_weekly_expected_hours_with_holidays
+		
+		monday = get_test_monday()
+		friday = add_days(monday, 4)
+		
+		# Create approved leave application for Friday
+		leave_app = frappe.get_doc({
+			"doctype": "Leave Application",
+			"employee": self.employee.name,
+			"leave_type": "Vacation Leave",
+			"from_date": friday,
+			"to_date": friday,
+			"status": "Approved"
+		})
+		leave_app.insert()
+		leave_app.submit()
+		frappe.db.commit()
+		
+		# Calculate expected hours
+		expected = calculate_weekly_expected_hours_with_holidays(self.employee.name, monday)
+		
+		# Base: 40h, work days: 5, daily_avg: 8h
+		# Expected: 40h - (1 leave × 8h) = 32h
+		self.assertAlmostEqual(expected, 32.0, places=1)
+	
+	def test_80_percent_fte_regular_leave_reduces_expected(self):
+		"""Test that 80% FTE with 1 regular leave day reduces weekly expected proportionally"""
+		from flexitime.flexitime.utils import calculate_weekly_expected_hours_with_holidays
+		
+		# Update work pattern to 80% FTE
+		pattern = frappe.get_doc("Employee Work Pattern", self.work_pattern.name)
+		pattern.fte_percentage = 80
+		pattern.save()
+		frappe.db.commit()
+		
+		monday = get_test_monday()
+		friday = add_days(monday, 4)
+		
+		# Create approved leave application for Friday
+		leave_app = frappe.get_doc({
+			"doctype": "Leave Application",
+			"employee": self.employee.name,
+			"leave_type": "Sick Leave",
+			"from_date": friday,
+			"to_date": friday,
+			"status": "Approved"
+		})
+		leave_app.insert()
+		leave_app.submit()
+		frappe.db.commit()
+		
+		# Calculate expected hours
+		expected = calculate_weekly_expected_hours_with_holidays(self.employee.name, monday)
+		
+		# Base: 40h, FTE: 80% → 32h, work days: 5, daily_avg: 6.4h
+		# Expected: 32h - (1 leave × 6.4h) = 25.6h
+		self.assertAlmostEqual(expected, 25.6, places=1)
+	
+	def test_half_day_leave_reduces_by_half(self):
+		"""Test that half-day leave reduces expected by half of daily average"""
+		from flexitime.flexitime.utils import calculate_weekly_expected_hours_with_holidays
+		
+		monday = get_test_monday()
+		friday = add_days(monday, 4)
+		
+		# Create approved half-day leave application for Friday
+		leave_app = frappe.get_doc({
+			"doctype": "Leave Application",
+			"employee": self.employee.name,
+			"leave_type": "Vacation Leave",
+			"from_date": friday,
+			"to_date": friday,
+			"half_day": 1,
+			"half_day_date": friday,
+			"status": "Approved"
+		})
+		leave_app.insert()
+		leave_app.submit()
+		frappe.db.commit()
+		
+		# Calculate expected hours
+		expected = calculate_weekly_expected_hours_with_holidays(self.employee.name, monday)
+		
+		# Base: 40h, work days: 5, daily_avg: 8h
+		# Expected: 40h - (0.5 leave × 8h) = 36h
+		self.assertAlmostEqual(expected, 36.0, places=1)
+	
+	def test_flex_off_does_not_reduce_expected(self):
+		"""Test that Flex Off does NOT reduce weekly expected (already in pattern)"""
+		from flexitime.flexitime.utils import calculate_weekly_expected_hours_with_holidays
+		
+		monday = get_test_monday()
+		friday = add_days(monday, 4)
+		
+		# Create approved Flex Off application for Friday
+		leave_app = frappe.get_doc({
+			"doctype": "Leave Application",
+			"employee": self.employee.name,
+			"leave_type": "Flex Off",
+			"from_date": friday,
+			"to_date": friday,
+			"status": "Approved"
+		})
+		leave_app.insert()
+		leave_app.submit()
+		frappe.db.commit()
+		
+		# Calculate expected hours
+		expected = calculate_weekly_expected_hours_with_holidays(self.employee.name, monday)
+		
+		# Base: 40h, Flex Off doesn't reduce expected (already in pattern)
+		# Expected: 40h (no reduction)
+		self.assertAlmostEqual(expected, 40.0, places=1)
+	
+	def test_multiple_leaves_reduce_expected(self):
+		"""Test that multiple regular leave days reduce expected proportionally"""
+		from flexitime.flexitime.utils import calculate_weekly_expected_hours_with_holidays
+		
+		monday = get_test_monday()
+		wednesday = add_days(monday, 2)
+		friday = add_days(monday, 4)
+		
+		# Create approved leave applications for Wednesday and Friday
+		for date in [wednesday, friday]:
+			leave_app = frappe.get_doc({
+				"doctype": "Leave Application",
+				"employee": self.employee.name,
+				"leave_type": "Vacation Leave",
+				"from_date": date,
+				"to_date": date,
+				"status": "Approved"
+			})
+			leave_app.insert()
+			leave_app.submit()
+		
+		frappe.db.commit()
+		
+		# Calculate expected hours
+		expected = calculate_weekly_expected_hours_with_holidays(self.employee.name, monday)
+		
+		# Base: 40h, work days: 5, daily_avg: 8h
+		# Expected: 40h - (2 leaves × 8h) = 24h
+		self.assertAlmostEqual(expected, 24.0, places=1)
+	
+	def test_leaves_and_holidays_both_reduce_expected(self):
+		"""Test that both leaves and holidays reduce expected hours"""
+		from flexitime.flexitime.utils import calculate_weekly_expected_hours_with_holidays
+		
+		# Create a holiday for Tuesday
+		company = frappe.db.get_value("Employee", self.employee.name, "company")
+		holiday_list = frappe.db.get_value("Company", company, "default_holiday_list")
+		
+		if holiday_list:
+			tuesday = add_days(get_test_monday(), 1)
+			# Check if holiday already exists
+			if not frappe.db.exists("Holiday", {
+				"parent": holiday_list,
+				"holiday_date": tuesday
+			}):
+				frappe.get_doc({
+					"doctype": "Holiday",
+					"parent": holiday_list,
+					"parenttype": "Holiday List",
+					"parentfield": "holidays",
+					"holiday_date": tuesday,
+					"description": "Test Holiday"
+				}).insert()
+		
+		monday = get_test_monday()
+		friday = add_days(monday, 4)
+		
+		# Create approved leave application for Friday
+		leave_app = frappe.get_doc({
+			"doctype": "Leave Application",
+			"employee": self.employee.name,
+			"leave_type": "Vacation Leave",
+			"from_date": friday,
+			"to_date": friday,
+			"status": "Approved"
+		})
+		leave_app.insert()
+		leave_app.submit()
+		frappe.db.commit()
+		
+		# Calculate expected hours
+		expected = calculate_weekly_expected_hours_with_holidays(self.employee.name, monday)
+		
+		# Base: 40h, work days: 5, daily_avg: 8h
+		# Expected: 40h - (1 holiday × 8h) - (1 leave × 8h) = 24h
+		self.assertAlmostEqual(expected, 24.0, places=1)

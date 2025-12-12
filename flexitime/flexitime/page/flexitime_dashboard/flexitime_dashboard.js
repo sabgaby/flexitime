@@ -33,9 +33,10 @@ class FlexitimeDashboard {
 				<div class="chart-container mb-4"></div>
 				<div class="row mb-4">
 					<div class="col-md-6">
-						<div class="frappe-card pending-leaves">
+						<div class="frappe-card leave-planning-summary">
 							<div class="card-head">
-								<span class="card-head-title">${__('Pending Leave Approvals')}</span>
+								<span class="card-head-title">${__('Leave Planning Summary')}</span>
+								<span class="card-head-subtitle text-muted ml-2">${new Date().getFullYear()}</span>
 							</div>
 							<div class="card-body section-content"></div>
 						</div>
@@ -80,7 +81,7 @@ class FlexitimeDashboard {
 			await Promise.all([
 				this.load_number_cards(),
 				this.load_today_chart(),
-				this.load_pending_leaves(),
+				this.load_leave_planning_summary(),
 				this.load_balance_alerts(),
 				this.load_missing_roll_call(),
 				this.load_missing_timesheets()
@@ -219,43 +220,125 @@ class FlexitimeDashboard {
 		});
 	}
 
-	async load_pending_leaves() {
+	async load_leave_planning_summary() {
 		const result = await frappe.call({
-			method: 'frappe.client.get_list',
+			method: 'flexitime.api.roll_call.get_leave_planning_summary',
 			args: {
-				doctype: 'Leave Application',
-				fields: ['name', 'employee', 'employee_name', 'leave_type', 'from_date', 'to_date', 'total_leave_days'],
-				filters: { status: 'Open', docstatus: 0 },
-				order_by: 'from_date asc',
-				limit_page_length: 10
+				year: new Date().getFullYear().toString(),
+				employee_filter: 'managed'
 			}
 		});
 
-		const leaves = result.message || [];
-		const container = this.wrapper.find('.pending-leaves .section-content');
+		const data = result.message || {};
+		const container = this.wrapper.find('.leave-planning-summary .section-content');
 
-		if (leaves.length === 0) {
-			container.html(`<p class="text-muted">${__('No pending leave applications')}</p>`);
-			return;
+		const tentative = data.tentative || { total_days: 0, employee_count: 0, by_employee: [] };
+		const pending = data.pending_approval || { count: 0, applications: [] };
+		const conflicts = data.conflicts || [];
+
+		// Build summary cards
+		let html = `
+			<div class="row mb-3">
+				<div class="col-4 text-center">
+					<div class="summary-stat">
+						<div class="stat-value text-warning">${tentative.total_days}</div>
+						<div class="stat-label text-muted small">${__('Tentative Days')}</div>
+					</div>
+				</div>
+				<div class="col-4 text-center">
+					<div class="summary-stat">
+						<div class="stat-value text-primary">${pending.count}</div>
+						<div class="stat-label text-muted small">${__('Pending Approval')}</div>
+					</div>
+				</div>
+				<div class="col-4 text-center">
+					<div class="summary-stat">
+						<div class="stat-value ${conflicts.length > 0 ? 'text-danger' : 'text-success'}">${conflicts.length}</div>
+						<div class="stat-label text-muted small">${__('Conflicts')}</div>
+					</div>
+				</div>
+			</div>`;
+
+		// Pending approvals section
+		if (pending.applications.length > 0) {
+			html += `
+				<div class="subsection mb-3">
+					<div class="subsection-title text-muted small mb-2">${__('Pending Approvals')}</div>
+					<div class="list-group list-group-flush">`;
+
+			pending.applications.slice(0, 5).forEach(leave => {
+				html += `
+					<div class="list-group-item d-flex justify-content-between align-items-center px-0 py-2">
+						<div>
+							<strong>${leave.employee_name}</strong>
+							<div class="text-muted small">
+								${leave.leave_type} · ${frappe.datetime.str_to_user(leave.from_date)} - ${frappe.datetime.str_to_user(leave.to_date)}
+								<span class="badge badge-secondary ml-1">${leave.days} ${__('days')}</span>
+							</div>
+						</div>
+						<a href="/app/leave-application/${leave.name}" class="btn btn-xs btn-primary">${__('Review')}</a>
+					</div>`;
+			});
+
+			html += `</div></div>`;
 		}
 
-		let html = `<div class="list-group list-group-flush">`;
-
-		leaves.forEach(leave => {
+		// Conflicts section
+		if (conflicts.length > 0) {
 			html += `
-				<div class="list-group-item d-flex justify-content-between align-items-center px-0">
-					<div>
-						<strong>${leave.employee_name}</strong>
-						<div class="text-muted small">
-							${leave.leave_type} · ${frappe.datetime.str_to_user(leave.from_date)} - ${frappe.datetime.str_to_user(leave.to_date)}
-							<span class="badge badge-secondary ml-1">${leave.total_leave_days} ${__('days')}</span>
-						</div>
+				<div class="subsection mb-3">
+					<div class="subsection-title text-muted small mb-2">
+						<span class="indicator-pill red">${__('Conflicts')}</span>
 					</div>
-					<a href="/app/leave-application/${leave.name}" class="btn btn-xs btn-primary">${__('Review')}</a>
-				</div>`;
-		});
+					<div class="list-group list-group-flush">`;
 
-		html += `</div>`;
+			conflicts.slice(0, 3).forEach(conflict => {
+				const employeeNames = conflict.employees.map(e => e.employee_name).join(', ');
+				html += `
+					<div class="list-group-item px-0 py-2">
+						<div class="d-flex justify-content-between align-items-center">
+							<strong>${frappe.datetime.str_to_user(conflict.date)}</strong>
+							<span class="badge badge-danger">${conflict.count} ${__('people')}</span>
+						</div>
+						<div class="text-muted small">${employeeNames}</div>
+					</div>`;
+			});
+
+			html += `</div></div>`;
+		}
+
+		// Tentative section (employees planning leave)
+		if (tentative.by_employee.length > 0) {
+			html += `
+				<div class="subsection">
+					<div class="subsection-title text-muted small mb-2">${__('Planning Leave')} (${tentative.employee_count} ${__('employees')})</div>
+					<div class="list-group list-group-flush">`;
+
+			tentative.by_employee.slice(0, 5).forEach(emp => {
+				const rangeText = emp.date_ranges.map(r =>
+					r.from_date === r.to_date
+						? frappe.datetime.str_to_user(r.from_date)
+						: `${frappe.datetime.str_to_user(r.from_date)} - ${frappe.datetime.str_to_user(r.to_date)}`
+				).join(', ');
+
+				html += `
+					<div class="list-group-item d-flex justify-content-between align-items-center px-0 py-2">
+						<div>
+							<strong>${emp.employee_name}</strong>
+							<div class="text-muted small">${rangeText}</div>
+						</div>
+						<span class="badge badge-warning">${emp.days} ${__('days')}</span>
+					</div>`;
+			});
+
+			html += `</div></div>`;
+		}
+
+		// Empty state
+		if (tentative.total_days === 0 && pending.count === 0 && conflicts.length === 0) {
+			html = `<p class="text-muted text-center">${__('No leave planning activity')} ✓</p>`;
+		}
+
 		container.html(html);
 	}
 

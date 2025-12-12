@@ -12,7 +12,28 @@ class WeeklyEntry(Document):
 		self.set_week_end()
 		self.validate_week_start_is_monday()
 		self.validate_locked()
+		self.validate_no_hours_on_leave_days()
 		self.calculate_totals()
+
+	def validate_no_hours_on_leave_days(self):
+		"""Prevent submission if leave days have actual hours recorded.
+
+		Leave days should have 0 actual hours to maintain data consistency.
+		"""
+		# Only validate when trying to submit (docstatus about to become 1)
+		if self.docstatus == 0 and self._action == "submit":
+			errors = []
+			for daily in self.daily_entries:
+				if daily.leave_application and daily.actual_hours and daily.actual_hours > 0:
+					errors.append(f"{daily.date}: {daily.actual_hours} hours on approved leave")
+
+			if errors:
+				frappe.throw(
+					_("Cannot submit Weekly Entry. The following leave days have hours recorded:<br>"
+					  "{0}<br><br>"
+					  "Leave days should have 0 actual hours.").format("<br>".join(errors)),
+					title=_("Invalid Hours on Leave Days")
+				)
 
 	def set_week_end(self):
 		"""Auto-set week_end to 6 days after week_start"""
@@ -35,7 +56,33 @@ class WeeklyEntry(Document):
 	def calculate_totals(self):
 		"""Calculate all totals from daily entries"""
 		self.total_actual_hours = sum(d.actual_hours or 0 for d in self.daily_entries)
-		self.total_expected_hours = sum(d.expected_hours or 0 for d in self.daily_entries)
+		
+		# Calculate expected hours using holiday-adjusted calculation
+		# This accounts for FTE percentage, holidays, and leaves proportionally
+		from flexitime.flexitime.utils import calculate_weekly_expected_hours_with_holidays
+		try:
+			self.total_expected_hours = calculate_weekly_expected_hours_with_holidays(
+				self.employee, self.week_start
+			)
+		except Exception:
+			# Fallback to sum of daily expected hours if calculation fails
+			self.total_expected_hours = sum(d.expected_hours or 0 for d in self.daily_entries)
+		
+		# Validation: Compare weekly adjusted total with sum of daily expected hours
+		# This helps catch inconsistencies between daily and weekly calculations
+		daily_sum = sum(d.expected_hours or 0 for d in self.daily_entries)
+		diff = abs(self.total_expected_hours - daily_sum)
+		
+		# Log warning if significant difference (more than 0.5 hours)
+		# This can happen legitimately if leaves/holidays are adjusted proportionally
+		# but helps identify calculation issues
+		if diff > 0.5:
+			frappe.logger().warning(
+				f"Weekly Entry {self.name}: Weekly expected hours ({self.total_expected_hours:.2f}) "
+				f"differs from sum of daily expected hours ({daily_sum:.2f}) by {diff:.2f} hours. "
+				"This may be expected if leaves/holidays are adjusted proportionally."
+			)
+		
 		self.weekly_delta = self.total_actual_hours - self.total_expected_hours
 		self.timesheet_hours = sum(d.timesheet_hours or 0 for d in self.daily_entries)
 

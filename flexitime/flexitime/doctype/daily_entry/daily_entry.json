@@ -107,9 +107,10 @@
    "read_only": 1
   },
   {
+   "depends_on": "eval:doc.leave_application",
    "fieldname": "leave_application",
    "fieldtype": "Link",
-   "hidden": 1,
+   "hidden": 0,
    "label": "Leave Application",
    "options": "Leave Application",
    "read_only": 1

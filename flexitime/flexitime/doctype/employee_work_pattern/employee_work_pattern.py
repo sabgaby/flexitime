@@ -13,6 +13,7 @@ class EmployeeWorkPattern(Document):
 		self.validate_hours()
 		self.validate_dates()
 		self.validate_overlapping()
+		self.validate_against_base_hours()
 
 	def calculate_weekly_hours(self):
 		"""Auto-calculate total weekly expected hours"""
@@ -70,6 +71,40 @@ class EmployeeWorkPattern(Document):
 			frappe.throw(
 				f"Work pattern overlaps with existing pattern '{existing[0].name}' "
 				f"(valid from {existing[0].valid_from})"
+			)
+
+	def validate_against_base_hours(self):
+		"""Validate that work pattern weekly hours align with Company base hours and FTE%.
+		
+		Shows a warning if the sum of daily hours doesn't match expected FTE weekly hours.
+		This is informational - doesn't prevent save, but helps ensure consistency.
+		"""
+		from flexitime.flexitime.utils import get_base_weekly_hours
+		
+		# Get employee's company
+		company = frappe.db.get_value("Employee", self.employee, "company")
+		if not company:
+			return  # Can't validate without company
+		
+		# Get base weekly hours
+		base_weekly_hours = get_base_weekly_hours(company)
+		
+		# Calculate expected FTE weekly hours
+		fte_percentage = self.fte_percentage or 100
+		expected_fte_weekly = base_weekly_hours * (fte_percentage / 100)
+		
+		# Compare with actual weekly hours from pattern
+		actual_weekly = self.weekly_expected_hours or 0
+		diff = abs(actual_weekly - expected_fte_weekly)
+		
+		# Warn if difference is significant (more than 0.5 hours)
+		if diff > 0.5:
+			frappe.msgprint(
+				f"Note: Weekly hours ({actual_weekly}h) differs from expected FTE hours "
+				f"({expected_fte_weekly:.1f}h based on {base_weekly_hours}h base × {fte_percentage}% FTE). "
+				f"Expected hours calculation will use FTE-adjusted base hours.",
+				indicator="orange",
+				alert=True
 			)
 
 	def get_hours_for_weekday(self, date):

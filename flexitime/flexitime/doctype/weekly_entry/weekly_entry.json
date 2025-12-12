@@ -96,7 +96,7 @@
    "read_only": 1
   },
   {
-   "description": "Sum of all daily expected hours",
+   "description": "Expected hours adjusted for FTE percentage, holidays, and leaves",
    "fieldname": "total_expected_hours",
    "fieldtype": "Float",
    "label": "Total Expected Hours",

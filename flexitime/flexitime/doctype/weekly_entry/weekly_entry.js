@@ -9,11 +9,23 @@ frappe.ui.form.on('Weekly Entry', {
 			'font-weight': '600'
 		});
 
-		// Highlight weekends
+		// Highlight weekends and handle leave day read-only state
 		frm.doc.daily_entries?.forEach((row, idx) => {
+			const grid_row = frm.fields_dict.daily_entries.grid.grid_rows[idx];
+			if (!grid_row) return;
+
+			// Highlight weekends
 			if (row.day_of_week === 'Saturday' || row.day_of_week === 'Sunday') {
-				frm.fields_dict.daily_entries.grid.grid_rows[idx]?.row.css({
+				grid_row.row.css({
 					'background-color': 'var(--subtle-accent)'
+				});
+			}
+
+			// Make actual_hours read-only on leave days (rows with leave_application)
+			if (row.leave_application && frm.doc.docstatus === 0) {
+				grid_row.toggle_editable('actual_hours', false);
+				grid_row.row.css({
+					'background-color': 'var(--subtle-warning-bg, rgba(255, 193, 7, 0.1))'
 				});
 			}
 		});
@@ -144,20 +156,59 @@ frappe.ui.form.on('Weekly Entry', {
 
 	calculate_totals: function(frm) {
 		let total_actual = 0;
-		let total_expected = 0;
 
 		frm.doc.daily_entries?.forEach(row => {
 			total_actual += flt(row.actual_hours) || 0;
-			total_expected += flt(row.expected_hours) || 0;
 		});
 
-		const weekly_delta = total_actual - total_expected;
-		const running_balance = flt(frm.doc.previous_balance) + weekly_delta;
+		// Get holiday-adjusted expected hours from server
+		// This accounts for FTE percentage and holidays proportionally
+		if (frm.doc.employee && frm.doc.week_start) {
+			frappe.call({
+				method: 'flexitime.flexitime.utils.calculate_weekly_expected_hours_with_holidays',
+				args: {
+					employee: frm.doc.employee,
+					week_start: frm.doc.week_start
+				},
+				callback: function(r) {
+					const total_expected = flt(r.message) || 0;
+					const weekly_delta = total_actual - total_expected;
+					const running_balance = flt(frm.doc.previous_balance) + weekly_delta;
 
-		frm.set_value('total_actual_hours', total_actual);
-		frm.set_value('total_expected_hours', total_expected);
-		frm.set_value('weekly_delta', weekly_delta);
-		frm.set_value('running_balance', running_balance);
+					frm.set_value('total_actual_hours', total_actual);
+					frm.set_value('total_expected_hours', total_expected);
+					frm.set_value('weekly_delta', weekly_delta);
+					frm.set_value('running_balance', running_balance);
+				},
+				error: function() {
+					// Fallback to sum of daily expected hours if server call fails
+					let total_expected = 0;
+					frm.doc.daily_entries?.forEach(row => {
+						total_expected += flt(row.expected_hours) || 0;
+					});
+					const weekly_delta = total_actual - total_expected;
+					const running_balance = flt(frm.doc.previous_balance) + weekly_delta;
+
+					frm.set_value('total_actual_hours', total_actual);
+					frm.set_value('total_expected_hours', total_expected);
+					frm.set_value('weekly_delta', weekly_delta);
+					frm.set_value('running_balance', running_balance);
+				}
+			});
+		} else {
+			// Fallback if employee/week_start not set
+			let total_expected = 0;
+			frm.doc.daily_entries?.forEach(row => {
+				total_expected += flt(row.expected_hours) || 0;
+			});
+			const weekly_delta = total_actual - total_expected;
+			const running_balance = flt(frm.doc.previous_balance) + weekly_delta;
+
+			frm.set_value('total_actual_hours', total_actual);
+			frm.set_value('total_expected_hours', total_expected);
+			frm.set_value('weekly_delta', weekly_delta);
+			frm.set_value('running_balance', running_balance);
+		}
 	}
 });
 

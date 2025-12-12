@@ -43,6 +43,7 @@ after_install = "flexitime.install.after_install"
 
 doc_events = {
 	"Leave Application": {
+		"before_submit": "flexitime.flexitime.events.leave_application.before_submit",
 		"on_update": "flexitime.flexitime.events.leave_application.on_update"
 	}
 }
