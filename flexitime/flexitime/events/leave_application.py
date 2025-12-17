@@ -1,6 +1,39 @@
 # Copyright (c) 2025, Gaby and contributors
 # For license information, please see license.txt
 
+"""Leave Application event handlers for Flexitime integration.
+
+This module handles the bidirectional sync between Leave Applications and
+the Flexitime system (Roll Call entries and Weekly Entries). When leave is
+approved or cancelled, this module ensures all related records are updated.
+
+Event Flow:
+    1. before_submit: Validates no hours are recorded for leave dates
+    2. on_update (Approved): Creates Roll Call entries, updates Weekly Entries,
+       creates Google Calendar event
+    3. on_update (Cancelled): Reverts Roll Call/Weekly entries, deletes
+       Google Calendar event
+
+Key Functions:
+    before_submit: Validates leave submission
+    on_update: Handles approval/cancellation
+    update_roll_call_for_leave: Creates/updates Roll Call entries
+    update_weekly_entries_for_leave: Updates Weekly Entry daily entries
+    create_google_calendar_event: Syncs to Google Calendar
+    revert_roll_call_for_leave: Restores previous state on cancellation
+    revert_weekly_entries_for_leave: Restores Weekly Entries on cancellation
+
+Dependencies:
+    - frappe
+    - integration_hub (optional, for Google Calendar sync)
+
+Configuration:
+    Settings are in Flexitime Settings:
+    - enable_calendar_sync: Enable/disable Google Calendar integration
+    - calendar_manager: User who manages the Absences calendar
+    - absences_calendar_id: Calendar ID for creating events
+"""
+
 import frappe
 from frappe import _
 from frappe.utils import getdate, add_days
@@ -392,7 +425,7 @@ def create_google_calendar_event(leave_app):
 			description += f"\nReason: {leave_app.description}"
 
 		# Create calendar service with the calendar manager's credentials
-		from google_workspace.services.calendar import GoogleCalendarService
+		from integration_hub.services.calendar import GoogleCalendarService
 
 		# Get the target calendar ID (shared Absences calendar)
 		calendar_id = getattr(flexitime_settings, 'absences_calendar_id', 'primary')
@@ -469,7 +502,7 @@ def delete_google_calendar_event(leave_app):
 				return
 
 		# Delete the event
-		from google_workspace.services.calendar import GoogleCalendarService
+		from integration_hub.services.calendar import GoogleCalendarService
 
 		calendar_id = getattr(flexitime_settings, 'absences_calendar_id', 'primary')
 		service = GoogleCalendarService(user=calendar_manager, calendar_id=calendar_id)

@@ -1,6 +1,46 @@
 # Copyright (c) 2025, Gaby and contributors
 # For license information, please see license.txt
 
+"""Row-level permission handlers for Flexitime DocTypes.
+
+This module implements custom permission logic for Flexitime's core DocTypes.
+It provides both query conditions (for list views) and document-level permission
+checks to ensure employees can only access and modify appropriate data.
+
+Permission Model Summary:
+    Roll Call Entry:
+        - HR Manager: Full access (read/write/delete all)
+        - Employee: Read all (team visibility), write only own, cannot edit locked
+
+    Weekly Entry:
+        - HR Manager: Full access
+        - Employee: Read/write only own, only when Draft
+
+    Employee Work Pattern:
+        - HR Manager: Full access
+        - Employee: Read-only access to own pattern
+
+Configuration:
+    These handlers are registered in hooks.py:
+        permission_query_conditions = {
+            "Roll Call Entry": "flexitime.flexitime.permissions.roll_call_entry_query",
+            ...
+        }
+        has_permission = {
+            "Roll Call Entry": "flexitime.flexitime.permissions.has_roll_call_permission",
+            ...
+        }
+
+Key Functions:
+    get_employee_for_user: Get employee ID for a user
+    roll_call_entry_query: List filter for Roll Call Entry
+    has_roll_call_permission: Document-level check for Roll Call Entry
+    weekly_entry_query: List filter for Weekly Entry
+    has_weekly_entry_permission: Document-level check for Weekly Entry
+    employee_work_pattern_query: List filter for Work Pattern
+    has_work_pattern_permission: Document-level check for Work Pattern
+"""
+
 import frappe
 
 
@@ -78,7 +118,8 @@ def weekly_entry_query(user):
 	if not employee:
 		return "1=0"  # No access if not an employee
 
-	return f"`tabWeekly Entry`.employee = '{employee}'"
+	# Use frappe.db.escape to prevent SQL injection
+	return f"`tabWeekly Entry`.employee = {frappe.db.escape(employee)}"
 
 
 def has_weekly_entry_permission(doc, ptype, user):
@@ -123,7 +164,8 @@ def employee_work_pattern_query(user):
 	if not employee:
 		return "1=0"  # No access if not an employee
 
-	return f"`tabEmployee Work Pattern`.employee = '{employee}'"
+	# Use frappe.db.escape to prevent SQL injection
+	return f"`tabEmployee Work Pattern`.employee = {frappe.db.escape(employee)}"
 
 
 def has_work_pattern_permission(doc, ptype, user):

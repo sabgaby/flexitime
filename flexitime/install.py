@@ -1,6 +1,49 @@
 # Copyright (c) 2025, Gaby and contributors
 # For license information, please see license.txt
 
+"""Post-installation setup for Flexitime application.
+
+This module runs after the app is installed via `bench install-app flexitime`.
+It creates the default data and custom fields required for the app to function.
+
+Installation Steps:
+    1. Custom Fields: Adds fields to Employee, Leave Application
+    2. Client Scripts: Adds form customizations
+    3. Leave Types: Creates "Flex Off" leave type
+    4. Presence Types: Creates default presence types (Office, Home, Vacation, etc.)
+    5. Email Templates: Creates reminder and alert templates
+
+Custom Fields Created:
+    Employee:
+        - custom_flexitime_balance: Running flexitime balance
+        - calendar_feed_token: Token for iCal subscription
+
+    Leave Application:
+        - google_calendar_event_id: For calendar sync
+        - google_calendar_event_url: Link to calendar event
+
+Presence Types Created:
+    Working: office, home_office, working_offsite
+    Leave: vacation, sick_leave, flex_off, leave (generic)
+    Scheduled: holiday, weekend, day_off
+
+Email Templates:
+    - Roll Call Reminder
+    - Timesheet Reminder
+    - Missing Timesheet Alert
+    - HR Missing Timesheet Summary
+    - Balance Over Limit
+    - Balance Warning
+    - HR Balance Alerts Summary
+
+Usage:
+    This module is called automatically via hooks.py:
+        after_install = "flexitime.install.after_install"
+
+    To re-run manually:
+        bench --site <site> execute flexitime.install.after_install
+"""
+
 import frappe
 import json
 import os
@@ -105,13 +148,76 @@ def create_leave_types():
 
 
 def create_presence_types():
-	"""Create default Presence Types"""
+	"""Create default Presence Types.
+
+	IMPORTANT: The system types (holiday, weekend, day_off) are REQUIRED for
+	the auto_create_roll_call_entries task to function. These are created first
+	with hardcoded values to ensure they always exist, independent of fixtures.
+	"""
+	# REQUIRED system types - these MUST exist for scheduled tasks to work
+	# The get_auto_presence_type() function returns these hardcoded names
+	required_system_types = [
+		{
+			"doctype": "Presence Type",
+			"presence_name": "holiday",
+			"label": "Holiday",
+			"icon": "🥳",
+			"category": "Scheduled",
+			"is_system": 1,
+			"available_to_all": 0,
+			"show_in_quick_dialog": 0,
+			"sort_order": 42
+		},
+		{
+			"doctype": "Presence Type",
+			"presence_name": "weekend",
+			"label": "Weekend",
+			"icon": "⬜",
+			"category": "Scheduled",
+			"is_system": 1,
+			"available_to_all": 0,
+			"show_in_quick_dialog": 0,
+			"sort_order": 41
+		},
+		{
+			"doctype": "Presence Type",
+			"presence_name": "day_off",
+			"label": "Day off",
+			"icon": "😶‍🌫️",
+			"category": "Scheduled",
+			"is_system": 1,
+			"available_to_all": 0,
+			"show_in_quick_dialog": 0,
+			"requires_pattern_match": 1,
+			"sort_order": 40
+		}
+	]
+
+	# Create required system types first (these MUST exist)
+	for pt in required_system_types:
+		if frappe.db.exists("Presence Type", pt.get("presence_name")):
+			frappe.logger().info(f"Required system type already exists: {pt.get('presence_name')}")
+			continue
+
+		try:
+			doc = frappe.get_doc(pt)
+			doc.insert(ignore_permissions=True)
+			frappe.logger().info(f"Created required system type: {pt.get('presence_name')}")
+		except Exception as e:
+			# This is a critical error - log it prominently
+			frappe.log_error(
+				f"CRITICAL: Could not create required presence type {pt.get('presence_name')}: {e}",
+				"Flexitime Install Error"
+			)
+
+	# Now load optional presence types from fixture file
 	fixture_path = os.path.join(
 		os.path.dirname(__file__),
 		"flexitime", "fixtures", "presence_type.json"
 	)
 
 	if not os.path.exists(fixture_path):
+		frappe.logger().info("No presence_type.json fixture found, skipping optional types")
 		return
 
 	with open(fixture_path) as f:

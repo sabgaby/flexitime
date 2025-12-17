@@ -1,3 +1,46 @@
+# Copyright (c) 2025, Gaby and contributors
+# For license information, please see license.txt
+
+"""Flexitime Application Hooks.
+
+This file configures the Flexitime application within the Frappe framework.
+It defines scheduled tasks, document events, permissions, and other hooks
+that integrate the app with ERPNext/Frappe.
+
+Main Features:
+    - Roll Call: Daily presence tracking for employees
+    - Weekly Entry: Weekly time summaries with flexitime balance
+    - Employee Work Pattern: Define work schedules per employee
+    - Leave Integration: Automatic sync with Leave Applications
+    - Google Calendar: Optional calendar sync for absences
+    - Email Reminders: Automated reminders for missing entries
+
+Key Configurations:
+    required_apps: ["erpnext"]
+    after_install: Creates default presence types, email templates, custom fields
+
+Document Events:
+    Leave Application: before_submit, on_update
+        - Validates no hours recorded for leave dates
+        - Creates/reverts Roll Call and Weekly entries
+        - Syncs to Google Calendar (if enabled)
+
+Scheduled Tasks:
+    Daily: Lock past entries, auto-create system entries, sync timesheets
+    Weekly: Create weekly entries, calculate balances, send reminders
+    See scheduler_events for full schedule
+
+Permissions:
+    Custom permission queries for Roll Call Entry, Weekly Entry,
+    and Employee Work Pattern. See flexitime.flexitime.permissions module.
+
+Fixtures:
+    - Custom Fields (module=Flexitime)
+    - Client Scripts (module=Flexitime)
+    - Presence Types
+    - Email Templates (Roll Call/Timesheet reminders, balance alerts)
+"""
+
 app_name = "flexitime"
 app_title = "Flexitime"
 app_publisher = "Gaby"
@@ -15,7 +58,7 @@ add_to_apps_screen = [
 		"name": "flexitime",
 		"logo": "/assets/flexitime/images/flexitime-logo.svg",
 		"title": "Flexitime",
-		"route": "/flexitime/roll-call",
+		"route": "/app/roll-call",
 	}
 ]
 
@@ -25,13 +68,6 @@ add_to_apps_screen = [
 # include js, css files in header of desk.html
 app_include_css = "/assets/flexitime/css/flexitime.css"
 # app_include_js = ""
-
-# Website Route Rules
-# -------------------
-# Route /flexitime/* to the Vue SPA
-website_route_rules = [
-	{"from_route": "/flexitime/<path:app_path>", "to_route": "flexitime"},
-]
 
 # Installation
 # ------------
@@ -105,9 +141,10 @@ fixtures = [
 			["module", "=", "Flexitime"]
 		]
 	},
-	{
-		"dt": "Presence Type"
-	},
+	# Note: Presence Type is NOT included in fixtures.
+	# Default Presence Types are created by install.py on first install.
+	# Users can customize them via Setup > Presence Type without
+	# having their changes overwritten on every bench migrate.
 	{
 		"dt": "Email Template",
 		"filters": [

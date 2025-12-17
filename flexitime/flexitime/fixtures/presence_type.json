@@ -8,8 +8,7 @@
     "available_to_all": 1,
     "is_system": 0,
     "show_in_quick_dialog": 1,
-    "sort_order": 10,
-    "color": "blue"
+    "sort_order": 10
   },
   {
     "doctype": "Presence Type",
@@ -21,8 +20,7 @@
     "available_to_all": 0,
     "is_system": 0,
     "show_in_quick_dialog": 0,
-    "sort_order": 11,
-    "color": "blue"
+    "sort_order": 11
   },
   {
     "doctype": "Presence Type",
@@ -33,8 +31,7 @@
     "available_to_all": 0,
     "is_system": 0,
     "show_in_quick_dialog": 1,
-    "sort_order": 20,
-    "color": "green"
+    "sort_order": 20
   },
   {
     "doctype": "Presence Type",
@@ -45,8 +42,7 @@
     "available_to_all": 1,
     "is_system": 0,
     "show_in_quick_dialog": 1,
-    "sort_order": 30,
-    "color": "orange"
+    "sort_order": 30
   },
   {
     "doctype": "Presence Type",
@@ -58,8 +54,7 @@
     "available_to_all": 0,
     "is_system": 0,
     "show_in_quick_dialog": 0,
-    "sort_order": 31,
-    "color": "orange"
+    "sort_order": 31
   },
   {
     "doctype": "Presence Type",
@@ -71,8 +66,7 @@
     "available_to_all": 0,
     "is_system": 0,
     "show_in_quick_dialog": 0,
-    "sort_order": 32,
-    "color": "orange"
+    "sort_order": 32
   },
   {
     "doctype": "Presence Type",
@@ -84,8 +78,7 @@
     "available_to_all": 0,
     "is_system": 0,
     "show_in_quick_dialog": 0,
-    "sort_order": 33,
-    "color": "orange"
+    "sort_order": 33
   },
   {
     "doctype": "Presence Type",
@@ -97,8 +90,7 @@
     "is_system": 1,
     "show_in_quick_dialog": 0,
     "requires_pattern_match": 1,
-    "sort_order": 40,
-    "color": "gray"
+    "sort_order": 40
   },
   {
     "doctype": "Presence Type",
@@ -109,8 +101,7 @@
     "available_to_all": 0,
     "is_system": 1,
     "show_in_quick_dialog": 0,
-    "sort_order": 41,
-    "color": "gray"
+    "sort_order": 41
   },
   {
     "doctype": "Presence Type",
@@ -121,8 +112,7 @@
     "available_to_all": 0,
     "is_system": 1,
     "show_in_quick_dialog": 0,
-    "sort_order": 42,
-    "color": "yellow"
+    "sort_order": 42
   },
   {
     "doctype": "Presence Type",
@@ -135,8 +125,7 @@
     "is_system": 0,
     "show_in_quick_dialog": 1,
     "requires_leave_application": 1,
-    "sort_order": 50,
-    "color": "red"
+    "sort_order": 50
   },
   {
     "doctype": "Presence Type",
@@ -149,8 +138,7 @@
     "is_system": 0,
     "show_in_quick_dialog": 1,
     "requires_leave_application": 1,
-    "sort_order": 51,
-    "color": "red"
+    "sort_order": 51
   },
   {
     "doctype": "Presence Type",
@@ -163,8 +151,7 @@
     "is_system": 0,
     "show_in_quick_dialog": 0,
     "requires_leave_application": 1,
-    "sort_order": 52,
-    "color": "red"
+    "sort_order": 52
   },
   {
     "doctype": "Presence Type",
@@ -179,8 +166,7 @@
     "requires_leave_application": 1,
     "leave_type": "Flex Off",
     "deducts_from_flextime_balance": 1,
-    "sort_order": 53,
-    "color": "purple"
+    "sort_order": 53
   },
   {
     "doctype": "Presence Type",
@@ -193,8 +179,7 @@
     "is_system": 0,
     "show_in_quick_dialog": 0,
     "requires_leave_application": 1,
-    "sort_order": 54,
-    "color": "cyan"
+    "sort_order": 54
   },
   {
     "doctype": "Presence Type",
@@ -207,8 +192,7 @@
     "is_system": 0,
     "show_in_quick_dialog": 0,
     "requires_leave_application": 1,
-    "sort_order": 55,
-    "color": "pink"
+    "sort_order": 55
   },
   {
     "doctype": "Presence Type",
@@ -221,7 +205,6 @@
     "is_system": 0,
     "show_in_quick_dialog": 0,
     "requires_leave_application": 1,
-    "sort_order": 56,
-    "color": "gray"
+    "sort_order": 56
   }
 ]

@@ -1,6 +1,41 @@
 # Copyright (c) 2025, Gaby and contributors
 # For license information, please see license.txt
 
+"""Dashboard and general API endpoints for Flexitime.
+
+This module provides API endpoints for the Flexitime Dashboard and general
+operations like sending reminders. These endpoints are primarily used by
+the HR Dashboard page.
+
+API Endpoints (whitelisted):
+    Dashboard Data:
+        get_today_overview: Count employees by presence type for today
+        get_balance_alerts: Get employees with balance warnings (HR only)
+        get_missing_roll_call_next_week: Get employees missing Roll Call
+        get_missing_timesheets: Get employees with missing Weekly Entries
+
+    Reminders (HR only):
+        send_reminder: Send reminder to a specific employee
+        send_all_reminders: Send reminders to all employees with missing data
+
+    Data Retrieval:
+        get_roll_call_data: Get Roll Call data for a week
+
+    Legacy:
+        update_roll_call: Create/update Roll Call entry (use roll_call.save_entry instead)
+
+Permission Model:
+    - Dashboard endpoints are readable by all logged-in users
+    - Balance alerts and reminders require HR Manager role
+    - update_roll_call respects Roll Call Entry permissions
+
+Dependencies:
+    - frappe
+    - flexitime.flexitime.utils
+    - flexitime.flexitime.tasks.weekly
+    - flexitime.flexitime.doctype.employee_work_pattern
+"""
+
 import frappe
 from frappe import _
 from frappe.utils import today, add_days, getdate
@@ -43,11 +78,19 @@ def get_today_overview(date=None):
 
 @frappe.whitelist()
 def get_balance_alerts():
-	"""Get employees with balance alerts
+	"""Get employees with balance alerts.
+
+	Requires HR Manager role.
 
 	Returns:
 		list: Employees with balance warnings or over limit
+
+	Raises:
+		frappe.PermissionError: If user is not HR Manager
 	"""
+	if "HR Manager" not in frappe.get_roles():
+		frappe.throw(_("Only HR Managers can view balance alerts"), frappe.PermissionError)
+
 	from flexitime.flexitime.doctype.employee_work_pattern.employee_work_pattern import get_work_pattern
 
 	alerts = []
@@ -165,12 +208,20 @@ def get_missing_timesheets():
 
 @frappe.whitelist()
 def send_reminder(employee, reminder_type):
-	"""Send reminder to a specific employee
+	"""Send reminder to a specific employee.
+
+	Requires HR Manager role.
 
 	Args:
 		employee: Employee ID
 		reminder_type: 'roll-call' or 'timesheet'
+
+	Raises:
+		frappe.PermissionError: If user is not HR Manager
 	"""
+	if "HR Manager" not in frappe.get_roles():
+		frappe.throw(_("Only HR Managers can send reminders"), frappe.PermissionError)
+
 	emp = frappe.get_doc("Employee", employee)
 
 	if not emp.user_id:
@@ -214,11 +265,19 @@ def send_reminder(employee, reminder_type):
 
 @frappe.whitelist()
 def send_all_reminders(reminder_type):
-	"""Send reminders to all employees with missing data
+	"""Send reminders to all employees with missing data.
+
+	Requires HR Manager role.
 
 	Args:
 		reminder_type: 'roll-call' or 'timesheet'
+
+	Raises:
+		frappe.PermissionError: If user is not HR Manager
 	"""
+	if "HR Manager" not in frappe.get_roles():
+		frappe.throw(_("Only HR Managers can send reminders"), frappe.PermissionError)
+
 	if reminder_type == "roll-call":
 		missing = get_missing_roll_call_next_week()
 		for emp in missing:
@@ -298,7 +357,10 @@ def get_roll_call_data(week_start, department=None):
 
 @frappe.whitelist()
 def update_roll_call(employee, date, presence_type, notes=None):
-	"""Create or update a Roll Call Entry
+	"""Create or update a Roll Call Entry.
+
+	Note: This is a legacy wrapper. For new code, use
+	flexitime.api.roll_call.save_entry which has better validation.
 
 	Args:
 		employee: Employee ID
@@ -309,29 +371,8 @@ def update_roll_call(employee, date, presence_type, notes=None):
 	Returns:
 		str: Roll Call Entry name
 	"""
-	date = getdate(date)
-
-	existing = frappe.db.get_value("Roll Call Entry",
-		{"employee": employee, "date": date},
-		"name"
+	# Delegate to the doctype's function to avoid code duplication
+	from flexitime.flexitime.doctype.roll_call_entry.roll_call_entry import (
+		update_roll_call as _update_roll_call
 	)
-
-	if existing:
-		doc = frappe.get_doc("Roll Call Entry", existing)
-		doc.presence_type = presence_type
-		doc.source = "Manual"
-		if notes is not None:
-			doc.notes = notes
-		doc.save()
-	else:
-		doc = frappe.get_doc({
-			"doctype": "Roll Call Entry",
-			"employee": employee,
-			"date": date,
-			"presence_type": presence_type,
-			"source": "Manual",
-			"notes": notes
-		})
-		doc.insert()
-
-	return doc.name
+	return _update_roll_call(employee, date, presence_type, notes)

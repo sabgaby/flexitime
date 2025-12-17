@@ -1,0 +1,90 @@
+{% extends "templates/web.html" %}
+
+{% block title %}Roll Call{% endblock %}
+
+{% block head_include %}
+<link rel="stylesheet" href="/assets/flexitime/css/roll_call_portal.css">
+{% endblock %}
+
+{% block page_content %}
+<div class="roll-call-portal">
+	<!-- Header -->
+	<div class="portal-header">
+		<h1>{{ _("Roll Call") }}</h1>
+		<p class="text-muted">{{ _("View and manage your daily presence") }}</p>
+	</div>
+
+	<!-- Toolbar -->
+	<div class="portal-toolbar">
+		<div class="toolbar-nav">
+			<button class="btn btn-default btn-sm btn-today">{{ _("Today") }}</button>
+			<button class="btn btn-default btn-sm btn-prev" title="{{ _('Previous Week') }}">
+				<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+					<path d="M10 2L4 8l6 6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+				</svg>
+			</button>
+			<span class="date-range"></span>
+			<button class="btn btn-default btn-sm btn-next" title="{{ _('Next Week') }}">
+				<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+					<path d="M6 2l6 6-6 6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+				</svg>
+			</button>
+		</div>
+		<div class="toolbar-actions">
+			<label class="weekend-toggle">
+				<input type="checkbox" class="show-weekends-check">
+				<span>{{ _("Show Weekends") }}</span>
+			</label>
+		</div>
+	</div>
+
+	<!-- Loading state -->
+	<div class="loading-state">
+		<div class="spinner"></div>
+		<p>{{ _("Loading...") }}</p>
+	</div>
+
+	<!-- Roll Call Grid -->
+	<div class="roll-call-grid-container" style="display: none;">
+		<table class="roll-call-grid">
+			<thead>
+				<tr class="month-row"></tr>
+				<tr class="day-row"></tr>
+			</thead>
+			<tbody></tbody>
+		</table>
+	</div>
+
+	<!-- Presence Type Selector Modal -->
+	<div class="presence-modal" style="display: none;">
+		<div class="presence-modal-backdrop"></div>
+		<div class="presence-modal-content">
+			<div class="presence-modal-header">
+				<h3>{{ _("Select Presence Type") }}</h3>
+				<button class="btn-close">&times;</button>
+			</div>
+			<div class="presence-modal-body">
+				<div class="presence-types-list"></div>
+			</div>
+		</div>
+	</div>
+
+	<!-- Legend -->
+	<div class="portal-legend">
+		<h4>{{ _("Legend") }}</h4>
+		<div class="legend-items"></div>
+	</div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+	// Pass server-side data to JavaScript
+	window.rollCallPortalData = {
+		currentEmployee: {{ current_employee | tojson }},
+		csrfToken: "{{ frappe.session.csrf_token }}",
+		isLoggedIn: {{ "true" if frappe.session.user != "Guest" else "false" }}
+	};
+</script>
+<script src="/assets/flexitime/js/roll_call_portal.js"></script>
+{% endblock %}

@@ -134,7 +134,19 @@ def update_roll_call(employee, date, presence_type, notes=None):
 
 	Returns:
 		str: Roll Call Entry name
+
+	Raises:
+		frappe.PermissionError: If user doesn't have permission to edit this employee's entry
 	"""
+	# Permission check: users can only edit their own entries (HR can edit anyone)
+	if "HR Manager" not in frappe.get_roles():
+		current_employee = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "name")
+		if current_employee != employee:
+			frappe.throw(
+				_("You can only edit your own Roll Call entries"),
+				frappe.PermissionError
+			)
+
 	date = getdate(date)
 
 	existing = frappe.db.get_value("Roll Call Entry",

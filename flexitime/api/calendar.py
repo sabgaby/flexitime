@@ -1,10 +1,48 @@
+# Copyright (c) 2025, Gaby and contributors
+# For license information, please see license.txt
+
 """iCal calendar feed for employee absences.
 
-Provides .ics calendar feeds that can be subscribed to in Google Calendar,
-Apple Calendar, Outlook, etc.
+This module provides .ics calendar feeds that can be subscribed to in
+Google Calendar, Apple Calendar, Outlook, and other calendar applications.
 
-Each employee gets a unique token-based URL that doesn't require authentication,
-allowing external calendar apps to fetch the feed.
+Features:
+    - Token-based authentication (no login required for calendar apps)
+    - Per-employee unique URLs for privacy
+    - Configurable display names via Flexitime Settings
+    - Includes Leave and Scheduled presence types (excludes weekends)
+    - Half-day support with AM/PM in event titles
+    - 3-month history + 12-month lookahead
+
+API Endpoints:
+    get_calendar_feed (allow_guest=True):
+        Returns .ics file for a token. URL format:
+        /api/method/flexitime.api.calendar.get_calendar_feed?token=<token>
+
+    get_my_calendar_url:
+        Returns the subscription URL for current user's calendar
+
+    regenerate_calendar_token:
+        Generates a new token (invalidates old URLs)
+
+Helper Functions:
+    get_or_create_calendar_token: Get/create token for an employee
+    get_employee_from_token: Look up employee from token
+    get_employee_display_name: Format employee name for calendar events
+
+Usage:
+    1. Employee visits Profile page or uses API to get their calendar URL
+    2. They add this URL as a calendar subscription in their calendar app
+    3. Calendar app fetches the .ics feed automatically
+
+Configuration:
+    Settings in Flexitime Settings:
+    - calendar_display_name: Format for names in calendar events
+      Options: Nickname, Full Name, Nickname (Full Name), Full Name (Nickname)
+
+Dependencies:
+    - frappe
+    - secrets (for token generation)
 """
 import frappe
 from frappe import _

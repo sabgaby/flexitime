@@ -1,6 +1,53 @@
 # Copyright (c) 2025, Gaby and contributors
 # For license information, please see license.txt
 
+"""Weekly scheduled tasks for Flexitime.
+
+This module contains background tasks that run weekly via Frappe's scheduler
+to automate reporting, balance calculations, and email reminders.
+
+Scheduled Tasks:
+    create_weekly_entries (Monday 06:00):
+        Creates Weekly Entry documents for all active employees
+
+    calculate_weekly_balances (Monday 01:00):
+        Recalculates running flexitime balance for all employees
+
+    check_balance_limits (Monday 08:00):
+        Sends alerts for employees approaching or exceeding flexitime limits
+
+    send_missing_timesheet_alerts (Monday 09:00):
+        Alerts employees and HR about unsubmitted Weekly Entries
+
+    send_submission_reminders (Monday 09:00):
+        Configurable reminders for Weekly Entry submission
+
+    send_roll_call_reminders (Friday 09:00):
+        Reminds employees to fill Roll Call for next week
+
+    send_timesheet_reminders (Friday 14:00):
+        Reminds employees to submit their Weekly Entry
+
+Configuration:
+    These tasks are registered in hooks.py under scheduler_events.
+    Reminder settings are in Flexitime Settings:
+    - enable_submission_reminders: Enable/disable submission reminders
+    - submission_reminder_day: Day of week for reminders
+
+Email Templates Used:
+    - Roll Call Reminder
+    - Timesheet Reminder
+    - Missing Timesheet Alert
+    - HR Missing Timesheet Summary
+    - Balance Over Limit
+    - Balance Warning
+    - HR Balance Alerts Summary
+
+Dependencies:
+    - frappe.utils (today, add_days, getdate)
+    - flexitime.flexitime.utils
+"""
+
 import frappe
 from frappe.utils import today, add_days, getdate
 

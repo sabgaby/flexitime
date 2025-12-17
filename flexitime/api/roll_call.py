@@ -1,3 +1,44 @@
+# Copyright (c) 2025, Gaby and contributors
+# For license information, please see license.txt
+
+"""Roll Call API endpoints for Flexitime.
+
+This module provides the main API endpoints for the Roll Call functionality,
+used by both the Desk page (/app/roll-call) and the Portal page (/roll-call).
+All endpoints require authentication.
+
+API Endpoints (whitelisted):
+    get_current_user_info: Get current user info for the SPA
+    get_default_company: Get user's default company
+    get_events: Get Roll Call entries for a date range (main data endpoint)
+    save_entry: Save/update a single Roll Call entry (full day)
+    save_split_entry: Save/update a split AM/PM Roll Call entry
+    save_bulk_entries: Save multiple entries in bulk
+    save_bulk_split_entries: Save multiple split entries in bulk
+    delete_bulk_entries: Delete multiple entries in bulk
+    get_leave_planning_summary: Get aggregated leave planning data
+
+Permission Model:
+    - All endpoints require login (not allow_guest)
+    - Employees can only edit their own entries (enforced by can_edit_employee_entry)
+    - HR Managers can edit anyone's entries
+    - Entries are synced to Weekly Entry on save
+
+Helper Functions:
+    get_current_employee: Get employee ID for current user
+    can_edit_employee_entry: Check if user can edit an employee's entry
+    is_hr_department_member: Check if user has HR Manager role
+    get_managed_employees_batch: Get employees managed by a manager
+    can_view_draft_status_batch: Check if user can see draft leave status
+    validate_presence_type_for_roll_call: Validate presence type before save
+    sync_roll_call_to_weekly_entry: Sync changes to Weekly Entry
+
+Dependencies:
+    - frappe
+    - flexitime.flexitime.doctype.weekly_entry.weekly_entry
+    - flexitime.flexitime.doctype.employee_work_pattern.employee_work_pattern
+"""
+
 import frappe
 from frappe import _
 from frappe.utils import getdate, add_days
@@ -9,6 +50,28 @@ def get_current_employee():
 	if user == "Guest":
 		return None
 	return frappe.db.get_value("Employee", {"user_id": user}, "name")
+
+
+def can_edit_employee_entry(target_employee: str) -> bool:
+	"""Check if current user can edit entries for the target employee.
+
+	Permission rules:
+	- HR Manager can edit anyone's entries
+	- Employees can only edit their own entries
+
+	Args:
+		target_employee: The employee whose entry is being edited
+
+	Returns:
+		bool: True if user has permission to edit
+	"""
+	# HR Managers can edit anyone
+	if is_hr_department_member():
+		return True
+
+	# Regular users can only edit their own
+	current_emp = get_current_employee()
+	return current_emp == target_employee
 
 
 def is_hr_department_member():
@@ -909,7 +972,17 @@ def save_entry(employee: str, date: str, presence_type: str, is_half_day: bool =
 
 	Returns:
 	    dict: The saved entry with leave_status calculated
+
+	Raises:
+	    frappe.PermissionError: If user doesn't have permission to edit this employee's entry
 	"""
+	# Permission check: users can only edit their own entries (HR can edit anyone)
+	if not can_edit_employee_entry(employee):
+		frappe.throw(
+			_("You can only edit your own Roll Call entries"),
+			frappe.PermissionError
+		)
+
 	if isinstance(is_half_day, str):
 		is_half_day = is_half_day.lower() in ("true", "1", "yes")
 
@@ -970,7 +1043,17 @@ def save_split_entry(employee: str, date: str, am_presence_type: str, pm_presenc
 
 	Returns:
 	    dict: The saved entry with leave_status calculated
+
+	Raises:
+	    frappe.PermissionError: If user doesn't have permission to edit this employee's entry
 	"""
+	# Permission check: users can only edit their own entries (HR can edit anyone)
+	if not can_edit_employee_entry(employee):
+		frappe.throw(
+			_("You can only edit your own Roll Call entries"),
+			frappe.PermissionError
+		)
+
 	# Validate both presence types (AM first as primary)
 	am_leave_application = validate_presence_type_for_roll_call(employee, date, am_presence_type)
 	pm_leave_application = validate_presence_type_for_roll_call(employee, date, pm_presence_type)
@@ -1036,6 +1119,9 @@ def save_bulk_entries(entries: list | str, presence_type: str, day_part: str = "
 
 	Returns:
 	    dict: Count of saved entries
+
+	Raises:
+	    frappe.PermissionError: If user tries to edit another employee's entry
 	"""
 	import json
 	if isinstance(entries, str):
@@ -1043,6 +1129,17 @@ def save_bulk_entries(entries: list | str, presence_type: str, day_part: str = "
 
 	if not entries:
 		return {"saved": 0, "total": 0}
+
+	# Permission check: verify user can edit all employees in the list
+	is_hr = is_hr_department_member()
+	if not is_hr:
+		current_emp = get_current_employee()
+		for entry in entries:
+			if entry.get("employee") != current_emp:
+				frappe.throw(
+					_("You can only edit your own Roll Call entries"),
+					frappe.PermissionError
+				)
 
 	# Get presence type info once
 	pt_info = frappe.db.get_value("Presence Type", presence_type, ["icon", "label"], as_dict=True) or {}
@@ -1208,6 +1305,9 @@ def save_bulk_split_entries(entries: list | str, am_presence_type: str, pm_prese
 
 	Returns:
 	    dict: Count of saved entries
+
+	Raises:
+	    frappe.PermissionError: If user tries to edit another employee's entry
 	"""
 	import json
 	if isinstance(entries, str):
@@ -1215,6 +1315,17 @@ def save_bulk_split_entries(entries: list | str, am_presence_type: str, pm_prese
 
 	if not entries:
 		return {"saved": 0, "total": 0}
+
+	# Permission check: verify user can edit all employees in the list
+	is_hr = is_hr_department_member()
+	if not is_hr:
+		current_emp = get_current_employee()
+		for entry in entries:
+			if entry.get("employee") != current_emp:
+				frappe.throw(
+					_("You can only edit your own Roll Call entries"),
+					frappe.PermissionError
+				)
 
 	# Get icons for presence types
 	am_icon = frappe.db.get_value("Presence Type", am_presence_type, "icon") or ""
@@ -1348,6 +1459,9 @@ def delete_bulk_entries(entries: list | str):
 
 	Returns:
 	    dict: Count of deleted entries
+
+	Raises:
+	    frappe.PermissionError: If user tries to delete another employee's entry
 	"""
 	import json
 	if isinstance(entries, str):
@@ -1360,6 +1474,17 @@ def delete_bulk_entries(entries: list | str):
 	keys = [(e.get("employee"), e.get("date")) for e in entries if e.get("employee") and e.get("date")]
 	if not keys:
 		return {"deleted": 0, "total": 0}
+
+	# Permission check: verify user can edit all employees in the list
+	is_hr = is_hr_department_member()
+	if not is_hr:
+		current_emp = get_current_employee()
+		for employee, _ in keys:
+			if employee != current_emp:
+				frappe.throw(
+					_("You can only delete your own Roll Call entries"),
+					frappe.PermissionError
+				)
 
 	# Batch find existing entries
 	conditions = " OR ".join([f"(employee = %s AND date = %s)" for _ in keys])

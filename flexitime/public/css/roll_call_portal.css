@@ -1,0 +1,581 @@
+/**
+ * Roll Call Portal Styles
+ *
+ * Styles for the website version of the Roll Call page.
+ * Designed for mobile-first, responsive layout.
+ */
+
+/* ============================================
+   Variables
+   ============================================ */
+:root {
+	--portal-primary: #4f46e5;
+	--portal-primary-light: #6366f1;
+	--portal-bg: #f9fafb;
+	--portal-card-bg: #ffffff;
+	--portal-border: #e5e7eb;
+	--portal-text: #111827;
+	--portal-text-muted: #6b7280;
+	--portal-today-bg: #fef3c7;
+	--portal-weekend-bg: #f3f4f6;
+	--portal-own-row-bg: #eff6ff;
+	--portal-hover: #f3f4f6;
+}
+
+/* ============================================
+   Layout
+   ============================================ */
+.roll-call-portal {
+	max-width: 1400px;
+	margin: 0 auto;
+	padding: 1.5rem;
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.portal-header {
+	margin-bottom: 1.5rem;
+}
+
+.portal-header h1 {
+	font-size: 1.75rem;
+	font-weight: 600;
+	color: var(--portal-text);
+	margin: 0 0 0.25rem 0;
+}
+
+.portal-header p {
+	color: var(--portal-text-muted);
+	margin: 0;
+}
+
+/* ============================================
+   Toolbar
+   ============================================ */
+.portal-toolbar {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 1rem;
+	margin-bottom: 1rem;
+	padding: 0.75rem 1rem;
+	background: var(--portal-card-bg);
+	border: 1px solid var(--portal-border);
+	border-radius: 8px;
+}
+
+.toolbar-nav {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.toolbar-nav .btn {
+	padding: 0.375rem 0.75rem;
+	border: 1px solid var(--portal-border);
+	background: var(--portal-card-bg);
+	border-radius: 6px;
+	cursor: pointer;
+	transition: all 0.15s;
+}
+
+.toolbar-nav .btn:hover {
+	background: var(--portal-hover);
+	border-color: var(--portal-primary);
+}
+
+.toolbar-nav .btn-prev,
+.toolbar-nav .btn-next {
+	padding: 0.375rem 0.5rem;
+}
+
+.date-range {
+	font-weight: 500;
+	color: var(--portal-text);
+	padding: 0 0.5rem;
+	min-width: 200px;
+	text-align: center;
+}
+
+.toolbar-actions {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+}
+
+.weekend-toggle {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	cursor: pointer;
+	font-size: 0.875rem;
+	color: var(--portal-text-muted);
+}
+
+.weekend-toggle input {
+	cursor: pointer;
+}
+
+/* ============================================
+   Loading State
+   ============================================ */
+.loading-state {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: 4rem 2rem;
+	color: var(--portal-text-muted);
+}
+
+.spinner {
+	width: 40px;
+	height: 40px;
+	border: 3px solid var(--portal-border);
+	border-top-color: var(--portal-primary);
+	border-radius: 50%;
+	animation: spin 0.8s linear infinite;
+	margin-bottom: 1rem;
+}
+
+@keyframes spin {
+	to { transform: rotate(360deg); }
+}
+
+/* ============================================
+   Roll Call Grid
+   ============================================ */
+.roll-call-grid-container {
+	overflow-x: auto;
+	background: var(--portal-card-bg);
+	border: 1px solid var(--portal-border);
+	border-radius: 8px;
+}
+
+.roll-call-grid {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 0.875rem;
+}
+
+/* Headers */
+.roll-call-grid thead th {
+	background: var(--portal-bg);
+	border-bottom: 1px solid var(--portal-border);
+	padding: 0.5rem;
+	font-weight: 500;
+	text-align: center;
+	white-space: nowrap;
+}
+
+.roll-call-grid .employee-col {
+	min-width: 180px;
+	max-width: 220px;
+	text-align: left;
+	padding-left: 1rem;
+	position: sticky;
+	left: 0;
+	background: var(--portal-bg);
+	z-index: 10;
+}
+
+.roll-call-grid tbody .employee-col {
+	background: var(--portal-card-bg);
+}
+
+.roll-call-grid .own-row .employee-col {
+	background: var(--portal-own-row-bg);
+}
+
+.roll-call-grid .month-header {
+	font-size: 0.75rem;
+	color: var(--portal-text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+
+.day-header {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.125rem;
+}
+
+.day-header .weekday {
+	font-size: 0.625rem;
+	color: var(--portal-text-muted);
+	text-transform: uppercase;
+}
+
+.day-header .day-num {
+	font-size: 0.875rem;
+	font-weight: 600;
+}
+
+.day-col.today .day-header {
+	color: var(--portal-primary);
+}
+
+.day-col.weekend {
+	background: var(--portal-weekend-bg);
+}
+
+/* Body */
+.roll-call-grid tbody tr {
+	border-bottom: 1px solid var(--portal-border);
+}
+
+.roll-call-grid tbody tr:last-child {
+	border-bottom: none;
+}
+
+.roll-call-grid tbody tr:hover {
+	background: var(--portal-hover);
+}
+
+.roll-call-grid .own-row {
+	background: var(--portal-own-row-bg);
+}
+
+.roll-call-grid .own-row:hover {
+	background: #dbeafe;
+}
+
+/* Employee cell */
+.employee-info {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	padding: 0.5rem 0;
+}
+
+.employee-avatar {
+	width: 32px;
+	height: 32px;
+	border-radius: 50%;
+	overflow: hidden;
+	flex-shrink: 0;
+	background: var(--portal-border);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.employee-avatar .avatar-img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.employee-avatar .avatar-letter {
+	font-weight: 600;
+	font-size: 0.875rem;
+	color: var(--portal-text-muted);
+}
+
+.employee-name {
+	font-weight: 500;
+	color: var(--portal-text);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* Day cells */
+.day-cell {
+	min-width: 44px;
+	height: 44px;
+	text-align: center;
+	vertical-align: middle;
+	border-left: 1px solid var(--portal-border);
+	position: relative;
+}
+
+.day-cell.weekend {
+	background: var(--portal-weekend-bg);
+}
+
+.day-cell.today {
+	background: var(--portal-today-bg);
+}
+
+.day-cell.editable {
+	cursor: pointer;
+	transition: all 0.15s;
+}
+
+.day-cell.editable:hover {
+	background: var(--portal-primary-light);
+	color: white;
+}
+
+.day-cell.editable:hover .presence-icon {
+	transform: scale(1.2);
+}
+
+.day-cell.has-entry {
+	background: var(--presence-color, #e5e7eb);
+}
+
+.day-cell.has-entry.today {
+	background: linear-gradient(135deg, var(--presence-color, #e5e7eb) 50%, var(--portal-today-bg) 50%);
+}
+
+.presence-icon {
+	display: inline-block;
+	font-size: 1.125rem;
+	transition: transform 0.15s;
+}
+
+/* ============================================
+   Presence Modal
+   ============================================ */
+.presence-modal {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	z-index: 1000;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 1rem;
+}
+
+.presence-modal-backdrop {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.5);
+}
+
+.presence-modal-content {
+	position: relative;
+	background: var(--portal-card-bg);
+	border-radius: 12px;
+	width: 100%;
+	max-width: 400px;
+	max-height: 80vh;
+	overflow: hidden;
+	box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.presence-modal-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 1rem 1.25rem;
+	border-bottom: 1px solid var(--portal-border);
+}
+
+.presence-modal-header h3 {
+	margin: 0;
+	font-size: 1.125rem;
+	font-weight: 600;
+}
+
+.presence-modal-header .btn-close {
+	background: none;
+	border: none;
+	font-size: 1.5rem;
+	line-height: 1;
+	cursor: pointer;
+	color: var(--portal-text-muted);
+	padding: 0.25rem;
+}
+
+.presence-modal-header .btn-close:hover {
+	color: var(--portal-text);
+}
+
+.presence-modal-body {
+	padding: 1rem;
+	overflow-y: auto;
+	max-height: calc(80vh - 60px);
+}
+
+.presence-types-list {
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	gap: 0.75rem;
+}
+
+.presence-type-option {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	padding: 0.875rem 1rem;
+	background: var(--portal-bg);
+	border: 2px solid transparent;
+	border-radius: 8px;
+	cursor: pointer;
+	transition: all 0.15s;
+	text-align: left;
+}
+
+.presence-type-option:hover {
+	border-color: var(--portal-primary);
+	background: var(--portal-card-bg);
+}
+
+.presence-type-option .option-icon {
+	width: 32px;
+	height: 32px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 8px;
+	background: var(--presence-color, var(--portal-border));
+	font-size: 1.125rem;
+}
+
+.presence-type-option .option-label {
+	font-weight: 500;
+	color: var(--portal-text);
+	font-size: 0.875rem;
+}
+
+.presence-type-option.clear-option {
+	grid-column: span 2;
+	justify-content: center;
+	background: var(--portal-card-bg);
+	border: 1px dashed var(--portal-border);
+}
+
+.presence-type-option.clear-option:hover {
+	border-style: solid;
+	border-color: #ef4444;
+}
+
+.presence-type-option.clear-option .option-icon {
+	background: #fee2e2;
+	color: #ef4444;
+}
+
+/* ============================================
+   Legend
+   ============================================ */
+.portal-legend {
+	margin-top: 1.5rem;
+	padding: 1rem;
+	background: var(--portal-card-bg);
+	border: 1px solid var(--portal-border);
+	border-radius: 8px;
+}
+
+.portal-legend h4 {
+	margin: 0 0 0.75rem 0;
+	font-size: 0.875rem;
+	font-weight: 600;
+	color: var(--portal-text);
+}
+
+.legend-items {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1rem;
+}
+
+.legend-item {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.legend-icon {
+	width: 24px;
+	height: 24px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 4px;
+	background: var(--presence-color, var(--portal-border));
+	font-size: 0.875rem;
+}
+
+.legend-label {
+	font-size: 0.8125rem;
+	color: var(--portal-text-muted);
+}
+
+/* ============================================
+   Responsive
+   ============================================ */
+@media (max-width: 768px) {
+	.roll-call-portal {
+		padding: 1rem;
+	}
+
+	.portal-toolbar {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.toolbar-nav {
+		justify-content: center;
+	}
+
+	.toolbar-actions {
+		justify-content: center;
+	}
+
+	.date-range {
+		min-width: auto;
+	}
+
+	.roll-call-grid .employee-col {
+		min-width: 120px;
+	}
+
+	.employee-info {
+		gap: 0.5rem;
+	}
+
+	.employee-avatar {
+		width: 28px;
+		height: 28px;
+	}
+
+	.employee-name {
+		font-size: 0.8125rem;
+	}
+
+	.day-cell {
+		min-width: 36px;
+		height: 36px;
+	}
+
+	.presence-icon {
+		font-size: 1rem;
+	}
+
+	.presence-types-list {
+		grid-template-columns: 1fr;
+	}
+
+	.presence-type-option.clear-option {
+		grid-column: span 1;
+	}
+}
+
+/* ============================================
+   Print Styles
+   ============================================ */
+@media print {
+	.portal-toolbar,
+	.portal-legend,
+	.presence-modal {
+		display: none !important;
+	}
+
+	.roll-call-grid-container {
+		border: none;
+	}
+
+	.day-cell.editable {
+		cursor: default;
+	}
+}

@@ -1,6 +1,42 @@
 # Copyright (c) 2025, Gaby and contributors
 # For license information, please see license.txt
 
+"""Utility functions for the Flexitime application.
+
+This module provides common helper functions used throughout the Flexitime
+application for date calculations, employee lookups, email sending, and
+flexitime balance calculations.
+
+Key Functions:
+    Date Utilities:
+        get_monday: Get the Monday of a week containing a date
+        is_holiday: Check if a date is a holiday
+        format_date: Format a date for display
+
+    Employee Utilities:
+        get_work_pattern: Get active work pattern for an employee
+        get_active_employees: Get list of active employees
+        is_timesheet_user: Check if employee uses timesheets
+
+    Balance Calculations:
+        get_base_weekly_hours: Get company's base weekly hours
+        get_leave_days_in_week: Get leave days for balance calculation
+        calculate_weekly_expected_hours_with_holidays: Calculate expected hours
+
+    Email Utilities:
+        send_email_template: Send templated emails
+        get_users_with_role: Get users with a specific role
+
+Dependencies:
+    - frappe
+    - ERPNext (for Holiday List, Company)
+
+Example:
+    >>> from flexitime.flexitime.utils import get_monday, is_holiday
+    >>> monday = get_monday("2025-01-15")  # Returns "2025-01-13"
+    >>> is_holiday("2025-01-01")  # Returns True if New Year's Day
+"""
+
 import frappe
 from frappe.utils import getdate, add_days
 

@@ -113,9 +113,13 @@ def get_employee_presence_permissions(employee, check_date=None):
 
 
 def get_auto_presence_type(employee, date):
-	"""Determine system-assigned presence type for a date
+	"""Determine system-assigned presence type for a date.
 
 	Returns: (presence_type, source, leave_application) tuple
+
+	Note: Returns (None, None, None) if required system types don't exist,
+	to prevent crashes in scheduled tasks. The install.py ensures these
+	types are created, but this provides a safety fallback.
 	"""
 	from frappe.utils import getdate
 	from flexitime.flexitime.utils import get_work_pattern, is_holiday
@@ -140,7 +144,15 @@ def get_auto_presence_type(employee, date):
 
 	# 2. Check Holiday List
 	if is_holiday(date, employee):
-		return "holiday", "System", None
+		# Verify the system type exists before returning it
+		if frappe.db.exists("Presence Type", "holiday"):
+			return "holiday", "System", None
+		else:
+			frappe.log_error(
+				"Required Presence Type 'holiday' not found. Run: bench --site <site> execute flexitime.install.after_install",
+				"Flexitime Configuration Error"
+			)
+			return None, None, None
 
 	# 3. Check Work Pattern
 	pattern = get_work_pattern(employee, date)
@@ -148,9 +160,25 @@ def get_auto_presence_type(employee, date):
 	expected = pattern.get_hours_for_weekday(date) if pattern else 8
 
 	if weekday in [5, 6] and expected == 0:
-		return "weekend", "System", None
+		# Verify the system type exists before returning it
+		if frappe.db.exists("Presence Type", "weekend"):
+			return "weekend", "System", None
+		else:
+			frappe.log_error(
+				"Required Presence Type 'weekend' not found. Run: bench --site <site> execute flexitime.install.after_install",
+				"Flexitime Configuration Error"
+			)
+			return None, None, None
 	elif expected == 0:
-		return "day_off", "System", None
+		# Verify the system type exists before returning it
+		if frappe.db.exists("Presence Type", "day_off"):
+			return "day_off", "System", None
+		else:
+			frappe.log_error(
+				"Required Presence Type 'day_off' not found. Run: bench --site <site> execute flexitime.install.after_install",
+				"Flexitime Configuration Error"
+			)
+			return None, None, None
 
 	# 4. No auto-assignment - needs manual entry
 	return None, None, None

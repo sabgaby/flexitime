@@ -1,6 +1,36 @@
 # Copyright (c) 2025, Gaby and contributors
 # For license information, please see license.txt
 
+"""Daily scheduled tasks for Flexitime.
+
+This module contains background tasks that run daily via Frappe's scheduler
+to maintain data integrity and automation in the Flexitime system.
+
+Scheduled Tasks:
+    lock_past_roll_call (00:05):
+        Locks Roll Call entries from past weeks to prevent modification
+
+    auto_create_roll_call_entries (00:10):
+        Pre-creates system entries for weekends, holidays, and days off
+
+    auto_lock_submitted_entries:
+        Locks submitted Weekly Entries after configured number of days
+
+    sync_timesheet_hours (every 2 hours):
+        Syncs hours from ERPNext Timesheets to Weekly Entry daily entries
+
+Configuration:
+    These tasks are registered in hooks.py under scheduler_events.
+    Auto-lock settings are in Flexitime Settings:
+    - enable_auto_lock: Enable/disable auto-locking
+    - auto_lock_after_days: Days after submission to lock
+
+Dependencies:
+    - frappe.utils (today, add_days, getdate)
+    - flexitime.flexitime.utils
+    - ERPNext Timesheet (for sync_timesheet_hours)
+"""
+
 import frappe
 from frappe.utils import today, add_days, getdate
 
