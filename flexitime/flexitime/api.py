@@ -315,11 +315,25 @@ def get_roll_call_data(week_start, department=None):
 	current_employee = frappe.db.get_value("Employee",
 		{"user_id": frappe.session.user}, "name")
 
-	# Get presence types
+	# Get ALL non-system presence types for legend display
 	presence_types = frappe.get_all("Presence Type",
-		fields=["name", "label", "icon", "category", "color", "is_system"],
+		filters={"is_system": 0},
+		fields=["name", "label", "icon", "category", "color", "available_to_all", "show_in_quick_dialog"],
 		order_by="sort_order asc"
 	)
+
+	# Determine which types the current employee can select
+	if current_employee:
+		from flexitime.flexitime.doctype.presence_type.presence_type import get_available_presence_types
+		selectable_types = get_available_presence_types(current_employee, week_start)
+		selectable_names = {pt["name"] for pt in selectable_types}
+	else:
+		# Non-employee users can only select available_to_all types
+		selectable_names = {pt["name"] for pt in presence_types if pt.get("available_to_all")}
+
+	# Add selectable flag to each type
+	for pt in presence_types:
+		pt["selectable"] = pt["name"] in selectable_names
 
 	# Get employees
 	emp_filters = {"status": "Active"}

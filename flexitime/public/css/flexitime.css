@@ -1112,6 +1112,21 @@
 	background: var(--item-color, var(--card-bg));
 }
 
+/* Disabled state - no permission to use this type */
+.palette-item.disabled,
+.palette-item:disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
+	pointer-events: none;
+}
+
+.palette-item.disabled:hover,
+.palette-item:disabled:hover {
+	transform: none;
+	border-color: var(--border-color);
+	background: var(--item-color, var(--card-bg));
+}
+
 .palette-item.palette-action {
 	background: var(--card-bg);
 }

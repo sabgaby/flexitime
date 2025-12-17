@@ -1362,10 +1362,11 @@ class RollCallTable {
 		);
 
 		const make_item = (pt) => `
-			<button class="palette-item"
+			<button class="palette-item${pt.selectable === false ? ' disabled' : ''}"
 					data-type="${pt.name}"
+					${pt.selectable === false ? 'disabled' : ''}
 					style="--item-color: ${this.get_color_var(pt.color)}"
-					title="${pt.label}">
+					title="${pt.label}${pt.selectable === false ? ' (' + __('no permission') + ')' : ''}">
 				<span class="palette-icon">${pt.icon || '•'}</span>
 				<span class="palette-label">${pt.label}</span>
 			</button>
@@ -1408,10 +1409,11 @@ class RollCallTable {
 
 		// Split mode palette - exact same layout as normal, just with AM/PM labels and data-half attribute
 		const make_split_palette_item = (pt, half) => `
-			<button class="palette-item palette-split-item"
+			<button class="palette-item palette-split-item${pt.selectable === false ? ' disabled' : ''}"
 					data-type="${pt.name}" data-half="${half}"
+					${pt.selectable === false ? 'disabled' : ''}
 					style="--item-color: ${this.get_color_var(pt.color)}"
-					title="${pt.label}">
+					title="${pt.label}${pt.selectable === false ? ' (' + __('no permission') + ')' : ''}">
 				<span class="palette-icon">${pt.icon || '•'}</span>
 				<span class="palette-label">${pt.label}</span>
 			</button>
