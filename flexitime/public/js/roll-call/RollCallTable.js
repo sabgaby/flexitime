@@ -178,7 +178,7 @@ class RollCallTable {
 					fieldname: ['roll_call_start_day', 'roll_call_display_name']
 				}
 			});
-			const start_day_setting = result.message?.roll_call_start_day || 'Today';
+			const start_day_setting = result.message?.roll_call_start_day || 'Current Day';
 			this.display_name_format = result.message?.roll_call_display_name || 'Full Name';
 
 			if (start_day_setting === 'Start of Week') {
@@ -187,7 +187,7 @@ class RollCallTable {
 				const getMonday = DateUtils.getMondayOfWeek || this.get_start_of_week.bind(this);
 				this.start_date = getMonday ? getMonday(frappe.datetime.get_today(), true) : this.get_start_of_week(frappe.datetime.get_today());
 			} else {
-				// Default: Today
+				// Default: Current Day
 				this.start_date = frappe.datetime.get_today();
 			}
 

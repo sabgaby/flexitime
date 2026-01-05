@@ -60,7 +60,6 @@ def check_custom_fields():
 	result = {"passed": True, "missing": []}
 	
 	expected_fields = [
-		{"dt": "Employee", "fieldname": "custom_flexitime_balance"},
 		{"dt": "Employee", "fieldname": "nickname"},
 		{"dt": "Leave Application", "fieldname": "google_calendar_event_id"},
 		{"dt": "Leave Application", "fieldname": "google_calendar_event_url"},

@@ -15,11 +15,9 @@ Installation Steps:
 
 Custom Fields Created:
     Employee:
-        - custom_flexitime_balance: Running flexitime balance
         - nickname: Short name for display in Roll Call
     
     Employee Presence Settings:
-        - flexitime_balance: Read-only display of employee's flexitime balance (fetched from Employee)
         - uses_timesheet: Whether employee uses ERPNext Timesheets for time tracking
         - show_in_roll_call: Controls which employees appear in Roll Call view
         - requires_weekly_entry: Controls which employees must submit weekly entries
@@ -69,32 +67,33 @@ def after_install():
 
 def create_custom_fields():
 	"""Create custom fields on various DocTypes"""
-	custom_dir = os.path.join(os.path.dirname(__file__), "flexitime", "custom")
+	# Read from fixtures/custom_field.json
+	fixture_path = os.path.join(
+		os.path.dirname(__file__),
+		"fixtures", "custom_field.json"
+	)
 
-	if not os.path.exists(custom_dir):
+	if not os.path.exists(fixture_path):
+		frappe.logger().warning("Custom fields fixture not found: " + fixture_path)
 		return
 
-	# Process all JSON files in custom directory
-	for filename in os.listdir(custom_dir):
-		if not filename.endswith(".json"):
-			continue
+	with open(fixture_path) as f:
+		custom_fields = json.load(f)
 
-		custom_fields_path = os.path.join(custom_dir, filename)
+	for field in custom_fields:
+		# Check if field already exists
+		existing = frappe.db.exists("Custom Field", {
+			"dt": field.get("dt"),
+			"fieldname": field.get("fieldname")
+		})
 
-		with open(custom_fields_path) as f:
-			custom_fields = json.load(f)
-
-		for field in custom_fields:
-			# Check if field already exists
-			existing = frappe.db.exists("Custom Field", {
-				"dt": field.get("dt"),
-				"fieldname": field.get("fieldname")
-			})
-
-			if not existing:
+		if not existing:
+			try:
 				doc = frappe.get_doc(field)
 				doc.insert(ignore_permissions=True)
 				frappe.logger().info(f"Created custom field: {field.get('dt')}.{field.get('fieldname')}")
+			except Exception as e:
+				frappe.logger().warning(f"Could not create custom field {field.get('dt')}.{field.get('fieldname')}: {e}")
 
 
 def create_client_scripts():
