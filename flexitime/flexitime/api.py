@@ -41,7 +41,7 @@ from frappe import _
 from frappe.utils import today, add_days, getdate
 
 from flexitime.flexitime.utils import (
-	get_monday, get_active_employees, format_date,
+	get_monday, get_active_employees, get_employees_requiring_weekly_entry, format_date,
 	send_email_template
 )
 
@@ -166,7 +166,7 @@ def get_missing_timesheets():
 	last_week = add_days(current_week, -7)
 
 	missing = []
-	employees = get_active_employees()
+	employees = get_employees_requiring_weekly_entry()
 
 	for employee in employees:
 		# Check last week
@@ -298,6 +298,40 @@ def send_all_reminders(reminder_type):
 
 
 @frappe.whitelist()
+def get_roll_call_employees(company=None, department=None):
+	"""Get list of employees who should appear in roll call
+	
+	This is a whitelisted API method that bypasses permission restrictions
+	to ensure all employees with show_in_roll_call=1 are visible, even if
+	they don't have users assigned.
+	
+	Args:
+		company (str, optional): Filter by company
+		department (str, optional): Filter by department
+	
+	Returns:
+		list: Employee documents with name, employee_name, image, nickname
+	"""
+	from flexitime.flexitime.utils import get_employees_showing_in_roll_call
+	roll_call_employees = get_employees_showing_in_roll_call(company=company, department=department)
+	
+	# Get additional fields for display
+	employee_names = [e.name for e in roll_call_employees]
+	if not employee_names:
+		return []
+	
+	# Get full employee details with ignore_permissions to bypass restrictions
+	employees = frappe.get_all("Employee",
+		filters={"status": "Active", "name": ["in", employee_names]},
+		fields=["name", "employee_name", "image", "nickname", "company", "department"],
+		order_by="employee_name asc",
+		ignore_permissions=True
+	)
+	
+	return employees
+
+
+@frappe.whitelist()
 def get_roll_call_data(week_start, department=None):
 	"""Get all roll call data for a week
 
@@ -315,10 +349,10 @@ def get_roll_call_data(week_start, department=None):
 	current_employee = frappe.db.get_value("Employee",
 		{"user_id": frappe.session.user}, "name")
 
-	# Get ALL non-system presence types for legend display
+	# Get ALL presence types for legend display
 	presence_types = frappe.get_all("Presence Type",
-		filters={"is_system": 0},
-		fields=["name", "label", "icon", "category", "color", "available_to_all", "show_in_quick_dialog"],
+		filters={},
+		fields=["name", "label", "icon", "expect_work_hours", "color", "available_to_all"],
 		order_by="sort_order asc"
 	)
 
@@ -335,15 +369,25 @@ def get_roll_call_data(week_start, department=None):
 	for pt in presence_types:
 		pt["selectable"] = pt["name"] in selectable_names
 
-	# Get employees
+	# Get employees who show in roll call from Employee Presence Settings
+	from flexitime.flexitime.utils import get_employees_showing_in_roll_call
+	roll_call_employees = get_employees_showing_in_roll_call()
+	employee_names = [e.name for e in roll_call_employees]
+	
+	# Apply department filter if provided
 	emp_filters = {"status": "Active"}
+	if employee_names:
+		emp_filters["name"] = ["in", employee_names]
 	if department:
 		emp_filters["department"] = department
 
+	# Use ignore_permissions=True to bypass permission restrictions
+	# This ensures employees without users are still visible in roll call
 	employees = frappe.get_all("Employee",
 		filters=emp_filters,
 		fields=["name", "employee_name", "department"],
-		order_by="employee_name asc"
+		order_by="employee_name asc",
+		ignore_permissions=True
 	)
 
 	# Get roll call entries for the week

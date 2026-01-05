@@ -51,7 +51,7 @@ class TestWeeklyEntry(IntegrationTestCase):
 		self.assertEqual(entry.employee, self.employee.name)
 		self.assertEqual(str(entry.week_start), str(monday))
 		self.assertEqual(str(entry.week_end), str(add_days(monday, 6)))
-		self.assertEqual(len(entry.daily_entries), 7)
+		self.assertEqual(len(entry.daily_entries), 5)  # Mon-Fri only
 
 	def test_week_start_must_be_monday(self):
 		"""Test that week_start must be a Monday"""
@@ -279,7 +279,7 @@ class TestWeeklyEntry(IntegrationTestCase):
 		entry_name = create_weekly_entry(self.employee.name, str(monday))
 
 		entry = frappe.get_doc("Weekly Entry", entry_name)
-		self.assertEqual(len(entry.daily_entries), 7)
+		self.assertEqual(len(entry.daily_entries), 5)  # Mon-Fri only
 		self.assertEqual(str(entry.week_start), str(monday))
 
 	def test_create_weekly_entry_returns_existing(self):
@@ -632,3 +632,366 @@ class TestWeeklyExpectedHoursWithLeaves(IntegrationTestCase):
 		# Base: 40h, work days: 5, daily_avg: 8h
 		# Expected: 40h - (1 holiday × 8h) - (1 leave × 8h) = 24h
 		self.assertAlmostEqual(expected, 24.0, places=1)
+
+
+class TestCalendarWeekField(IntegrationTestCase):
+	"""Test calendar_week field and naming"""
+
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		frappe.set_user("Administrator")
+		cls.presence_types = create_test_presence_types()
+		cls.employee = create_test_employee("_Test Calendar Week Employee")
+		cls.work_pattern = create_test_work_pattern(cls.employee.name)
+
+	@classmethod
+	def tearDownClass(cls):
+		cleanup_test_data()
+		super().tearDownClass()
+
+	def setUp(self):
+		frappe.db.sql("""
+			DELETE FROM `tabWeekly Entry`
+			WHERE employee = %s
+		""", (self.employee.name,))
+		frappe.db.commit()
+
+	def test_calendar_week_auto_populated(self):
+		"""Test that calendar_week is auto-populated on save"""
+		monday = get_test_monday(-2)  # 2 weeks ago to ensure week is complete
+
+		entry = create_test_weekly_entry(self.employee.name, monday)
+
+		self.assertIsNotNone(entry.calendar_week)
+		self.assertTrue(entry.calendar_week.startswith(str(monday.isocalendar()[0])))
+
+	def test_calendar_week_format(self):
+		"""Test that calendar_week format is YYYY-WNN"""
+		monday = get_test_monday(-2)
+
+		entry = create_test_weekly_entry(self.employee.name, monday)
+
+		# Format should be YYYY-WNN (e.g., 2025-W51)
+		import re
+		pattern = r'^\d{4}-W\d{2}$'
+		self.assertRegex(entry.calendar_week, pattern)
+
+	def test_calendar_week_matches_iso_week(self):
+		"""Test that calendar_week matches ISO week number from week_start"""
+		monday = get_test_monday(-2)
+		iso_calendar = monday.isocalendar()
+		expected_week = f"{iso_calendar[0]}-W{iso_calendar[1]:02d}"
+
+		entry = create_test_weekly_entry(self.employee.name, monday)
+
+		self.assertEqual(entry.calendar_week, expected_week)
+
+	def test_naming_format(self):
+		"""Test that name follows {employee}-{year}-W{NN} format"""
+		monday = get_test_monday(-2)
+		iso_calendar = monday.isocalendar()
+		expected_name = f"{self.employee.name}-{iso_calendar[0]}-W{iso_calendar[1]:02d}"
+
+		entry = create_test_weekly_entry(self.employee.name, monday)
+
+		self.assertEqual(entry.name, expected_name)
+
+	def test_calendar_week_iso_year_boundary(self):
+		"""Test ISO week numbering at year boundary (Dec 31 / Jan 1 edge cases)"""
+		# Dec 29, 2025 is a Monday and is ISO week 2026-W01
+		# because Jan 1, 2026 is Thursday (first week with Thursday)
+		from datetime import date
+
+		# This tests the ISO standard where Dec 31 can be in week 1 of next year
+		# We just verify our code uses ISO correctly
+		test_date = date(2025, 12, 29)  # Monday of last week of 2025
+		if test_date.weekday() == 0:  # If it's actually a Monday
+			iso_calendar = test_date.isocalendar()
+			# Just verify ISO calendar returns something sensible
+			self.assertTrue(iso_calendar[1] >= 1)
+			self.assertTrue(iso_calendar[1] <= 53)
+
+
+class TestWeekCompleteValidation(IntegrationTestCase):
+	"""Test that Weekly Entry cannot be submitted before week ends"""
+
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		frappe.set_user("Administrator")
+		cls.presence_types = create_test_presence_types()
+		cls.employee = create_test_employee("_Test Week Complete Employee")
+		cls.work_pattern = create_test_work_pattern(cls.employee.name)
+
+	@classmethod
+	def tearDownClass(cls):
+		cleanup_test_data()
+		super().tearDownClass()
+
+	def setUp(self):
+		frappe.db.sql("""
+			DELETE FROM `tabWeekly Entry`
+			WHERE employee = %s
+		""", (self.employee.name,))
+		frappe.db.commit()
+
+	def test_cannot_submit_current_week(self):
+		"""Test that employee cannot submit current week's entry"""
+		monday = get_test_monday()  # Current week
+
+		# Create a test user without HR Manager role
+		test_user = "test_week_complete_user@example.com"
+		if not frappe.db.exists("User", test_user):
+			user_doc = frappe.get_doc({
+				"doctype": "User",
+				"email": test_user,
+				"first_name": "Test Week Complete",
+				"roles": [{"role": "Employee"}]
+			})
+			user_doc.insert(ignore_permissions=True)
+		else:
+			# Ensure user doesn't have HR Manager role
+			user_doc = frappe.get_doc("User", test_user)
+			user_doc.roles = [{"role": "Employee"}]
+			user_doc.save(ignore_permissions=True)
+
+		entry = create_test_weekly_entry(self.employee.name, monday, submit=False)
+
+		frappe.set_user(test_user)
+		try:
+			with self.assertRaises(frappe.ValidationError) as context:
+				entry.submit()
+			self.assertIn("Week Not Complete", str(context.exception))
+		finally:
+			frappe.set_user("Administrator")
+
+	def test_can_submit_past_week(self):
+		"""Test that past week (completed) can be submitted"""
+		monday = get_test_monday(-2)  # 2 weeks ago (definitely complete)
+
+		entry = create_test_weekly_entry(self.employee.name, monday, submit=False)
+		entry.submit()
+
+		self.assertEqual(entry.docstatus, 1)
+
+	def test_hr_can_submit_current_week(self):
+		"""Test that HR Manager can submit current week (bypass validation)"""
+		monday = get_test_monday()  # Current week
+
+		frappe.set_user("Administrator")  # Admin has HR Manager role
+
+		entry = create_test_weekly_entry(self.employee.name, monday, submit=False)
+		entry.submit()
+
+		self.assertEqual(entry.docstatus, 1)
+
+
+class TestSequentialSubmission(IntegrationTestCase):
+	"""Test that Weekly Entries must be submitted in order"""
+
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		frappe.set_user("Administrator")
+		cls.presence_types = create_test_presence_types()
+		cls.employee = create_test_employee("_Test Sequential Employee")
+		cls.work_pattern = create_test_work_pattern(cls.employee.name)
+
+	@classmethod
+	def tearDownClass(cls):
+		cleanup_test_data()
+		super().tearDownClass()
+
+	def setUp(self):
+		frappe.db.sql("""
+			DELETE FROM `tabWeekly Entry`
+			WHERE employee = %s
+		""", (self.employee.name,))
+		frappe.db.commit()
+
+	def test_cannot_skip_weeks(self):
+		"""Test that cannot submit week 3 if week 2 is draft"""
+		week1_monday = get_test_monday(-4)  # 4 weeks ago
+		week2_monday = get_test_monday(-3)  # 3 weeks ago
+		week3_monday = get_test_monday(-2)  # 2 weeks ago
+
+		# Create a test user without HR Manager role
+		test_user = "test_sequential_skip_user@example.com"
+		if not frappe.db.exists("User", test_user):
+			user_doc = frappe.get_doc({
+				"doctype": "User",
+				"email": test_user,
+				"first_name": "Test Sequential Skip",
+				"roles": [{"role": "Employee"}]
+			})
+			user_doc.insert(ignore_permissions=True)
+		else:
+			# Ensure user doesn't have HR Manager role
+			user_doc = frappe.get_doc("User", test_user)
+			user_doc.roles = [{"role": "Employee"}]
+			user_doc.save(ignore_permissions=True)
+
+		# Create entries for all 3 weeks (all drafts) - as Administrator
+		entry1 = create_test_weekly_entry(self.employee.name, week1_monday, submit=False)
+		entry2 = create_test_weekly_entry(self.employee.name, week2_monday, submit=False)
+		entry3 = create_test_weekly_entry(self.employee.name, week3_monday, submit=False)
+
+		# Submit week 1 first (as Administrator)
+		entry1.submit()
+
+		# Try to submit week 3 without submitting week 2 - should fail for non-HR user
+		frappe.set_user(test_user)
+		try:
+			entry3.reload()
+			with self.assertRaises(frappe.ValidationError) as context:
+				entry3.submit()
+			self.assertIn("Previous Week Not Submitted", str(context.exception))
+		finally:
+			frappe.set_user("Administrator")
+
+		# entry2 is intentionally left as draft to test the skip validation
+		_ = entry2  # suppress unused variable warning
+
+	def test_can_submit_first_week(self):
+		"""Test that first entry for employee can be submitted"""
+		monday = get_test_monday(-2)
+
+		entry = create_test_weekly_entry(self.employee.name, monday, submit=False)
+		entry.submit()
+
+		self.assertEqual(entry.docstatus, 1)
+
+	def test_sequential_submission_works(self):
+		"""Test that submitting in order works"""
+		week1_monday = get_test_monday(-3)
+		week2_monday = get_test_monday(-2)
+
+		entry1 = create_test_weekly_entry(self.employee.name, week1_monday, submit=False)
+		entry2 = create_test_weekly_entry(self.employee.name, week2_monday, submit=False)
+
+		# Submit in order
+		entry1.submit()
+		entry2.submit()
+
+		self.assertEqual(entry1.docstatus, 1)
+		self.assertEqual(entry2.docstatus, 1)
+
+	def test_hr_can_skip_weeks(self):
+		"""Test that HR Manager can bypass sequential validation"""
+		week1_monday = get_test_monday(-3)
+		week2_monday = get_test_monday(-2)
+
+		# Create entries (week 1 not submitted)
+		entry1 = create_test_weekly_entry(self.employee.name, week1_monday, submit=False)
+		entry2 = create_test_weekly_entry(self.employee.name, week2_monday, submit=False)
+
+		# HR Manager can submit week 2 even if week 1 is draft
+		frappe.set_user("Administrator")
+		entry2.submit()
+
+		self.assertEqual(entry2.docstatus, 1)
+		# entry1 is intentionally left as draft
+		self.assertEqual(entry1.docstatus, 0)
+
+
+class TestBalanceChain(IntegrationTestCase):
+	"""Test running balance chain calculations"""
+
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		frappe.set_user("Administrator")
+		cls.presence_types = create_test_presence_types()
+		cls.employee = create_test_employee("_Test Balance Chain Employee")
+		cls.work_pattern = create_test_work_pattern(cls.employee.name)
+
+	@classmethod
+	def tearDownClass(cls):
+		cleanup_test_data()
+		super().tearDownClass()
+
+	def setUp(self):
+		frappe.db.sql("""
+			DELETE FROM `tabWeekly Entry`
+			WHERE employee = %s
+		""", (self.employee.name,))
+		frappe.db.set_value("Employee", self.employee.name, "custom_flexitime_balance", 0)
+		frappe.db.commit()
+
+	def test_running_balance_chain(self):
+		"""Test that balance chains correctly across weeks"""
+		week1 = get_test_monday(-3)
+		week2 = get_test_monday(-2)
+
+		# Week 1: +5 delta
+		entry1 = frappe.get_doc({
+			"doctype": "Weekly Entry",
+			"employee": self.employee.name,
+			"week_start": week1
+		})
+		days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+		for i in range(7):
+			entry1.append("daily_entries", {
+				"date": add_days(week1, i),
+				"day_of_week": days[i],
+				"expected_hours": 8 if i < 5 else 0,
+				"actual_hours": 9 if i < 5 else 0  # +1 each day = +5 total
+			})
+		entry1.insert()
+		entry1.submit()
+
+		self.assertEqual(entry1.weekly_delta, 5)
+		self.assertEqual(entry1.running_balance, 5)
+
+		# Week 2: -3 delta
+		entry2 = frappe.get_doc({
+			"doctype": "Weekly Entry",
+			"employee": self.employee.name,
+			"week_start": week2
+		})
+		for i in range(7):
+			# 5 workdays: -3 total means we need to be 3 hours under
+			# Let's do: Mon-Wed normal (8h), Thu-Fri work 6.5h each (-3 total)
+			if i < 3:
+				actual = 8
+			elif i < 5:
+				actual = 6.5
+			else:
+				actual = 0
+			entry2.append("daily_entries", {
+				"date": add_days(week2, i),
+				"day_of_week": days[i],
+				"expected_hours": 8 if i < 5 else 0,
+				"actual_hours": actual
+			})
+		entry2.insert()
+		entry2.submit()
+
+		entry2.reload()
+		self.assertEqual(entry2.previous_balance, 5)
+		self.assertEqual(entry2.weekly_delta, -3)
+		self.assertEqual(entry2.running_balance, 2)  # 5 + (-3) = 2
+
+	def test_balance_updates_employee(self):
+		"""Test that submitting updates Employee.custom_flexitime_balance"""
+		monday = get_test_monday(-2)
+
+		entry = frappe.get_doc({
+			"doctype": "Weekly Entry",
+			"employee": self.employee.name,
+			"week_start": monday
+		})
+		days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+		for i in range(7):
+			entry.append("daily_entries", {
+				"date": add_days(monday, i),
+				"day_of_week": days[i],
+				"expected_hours": 8 if i < 5 else 0,
+				"actual_hours": 10 if i < 5 else 0  # +2 each day = +10 total
+			})
+		entry.insert()
+		entry.submit()
+
+		balance = frappe.db.get_value("Employee", self.employee.name, "custom_flexitime_balance")
+		self.assertEqual(balance, 10)

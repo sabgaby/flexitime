@@ -3,77 +3,77 @@
 {% block title %}Roll Call{% endblock %}
 
 {% block head_include %}
-<link rel="stylesheet" href="/assets/flexitime/css/roll_call_portal.css">
+<!-- Load shared CSS variables and base styles first -->
+<link rel="stylesheet" href="/assets/flexitime/css/shared-variables.css">
+<link rel="stylesheet" href="/assets/flexitime/css/roll-call-base.css">
+<!-- Use same CSS as desk app -->
+<link rel="stylesheet" href="/assets/flexitime/css/flexitime.css">
+<style>
+	/* Minimal portal wrapper styles - desk app CSS handles the rest */
+	.roll-call-page-wrapper {
+		padding: 1rem;
+		max-width: 100%;
+	}
+	.roll-call-page-body {
+		width: 100%;
+	}
+	/* Ensure modal backdrop works in portal */
+	.modal-backdrop {
+		position: fixed;
+		top: 0;
+		left: 0;
+		z-index: 1040;
+		width: 100vw;
+		height: 100vh;
+		background-color: #000;
+		opacity: 0.5;
+	}
+	.modal {
+		position: fixed;
+		top: 0;
+		left: 0;
+		z-index: 1050;
+		display: none;
+		width: 100%;
+		height: 100%;
+		overflow-x: hidden;
+		overflow-y: auto;
+		outline: 0;
+	}
+	.modal.show {
+		display: block;
+	}
+	.modal-dialog {
+		position: relative;
+		width: auto;
+		margin: 1.75rem auto;
+		max-width: 500px;
+	}
+	.modal-content {
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		width: 100%;
+		background-color: #fff;
+		border: 1px solid rgba(0,0,0,.2);
+		border-radius: 0.3rem;
+		box-shadow: 0 0.25rem 0.5rem rgba(0,0,0,.5);
+	}
+	.modal-footer {
+		display: flex;
+		align-items: center;
+		justify-content: flex-end;
+		padding: 1rem;
+		border-top: 1px solid #dee2e6;
+	}
+</style>
 {% endblock %}
 
 {% block page_content %}
-<div class="roll-call-portal">
-	<!-- Header -->
-	<div class="portal-header">
-		<h1>{{ _("Roll Call") }}</h1>
-		<p class="text-muted">{{ _("View and manage your daily presence") }}</p>
-	</div>
-
-	<!-- Toolbar -->
-	<div class="portal-toolbar">
-		<div class="toolbar-nav">
-			<button class="btn btn-default btn-sm btn-today">{{ _("Today") }}</button>
-			<button class="btn btn-default btn-sm btn-prev" title="{{ _('Previous Week') }}">
-				<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-					<path d="M10 2L4 8l6 6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-				</svg>
-			</button>
-			<span class="date-range"></span>
-			<button class="btn btn-default btn-sm btn-next" title="{{ _('Next Week') }}">
-				<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-					<path d="M6 2l6 6-6 6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-				</svg>
-			</button>
-		</div>
-		<div class="toolbar-actions">
-			<label class="weekend-toggle">
-				<input type="checkbox" class="show-weekends-check">
-				<span>{{ _("Show Weekends") }}</span>
-			</label>
-		</div>
-	</div>
-
-	<!-- Loading state -->
-	<div class="loading-state">
-		<div class="spinner"></div>
-		<p>{{ _("Loading...") }}</p>
-	</div>
-
-	<!-- Roll Call Grid -->
-	<div class="roll-call-grid-container" style="display: none;">
-		<table class="roll-call-grid">
-			<thead>
-				<tr class="month-row"></tr>
-				<tr class="day-row"></tr>
-			</thead>
-			<tbody></tbody>
-		</table>
-	</div>
-
-	<!-- Presence Type Selector Modal -->
-	<div class="presence-modal" style="display: none;">
-		<div class="presence-modal-backdrop"></div>
-		<div class="presence-modal-content">
-			<div class="presence-modal-header">
-				<h3>{{ _("Select Presence Type") }}</h3>
-				<button class="btn-close">&times;</button>
-			</div>
-			<div class="presence-modal-body">
-				<div class="presence-types-list"></div>
-			</div>
-		</div>
-	</div>
-
-	<!-- Legend -->
-	<div class="portal-legend">
-		<h4>{{ _("Legend") }}</h4>
-		<div class="legend-items"></div>
-	</div>
+<!-- Container that mimics frappe.ui.make_app_page structure -->
+<div id="roll-call-page-wrapper" class="roll-call-page-wrapper">
+	<!-- This div will be used as page.body by RollCallTable -->
+	<div class="roll-call-page-body"></div>
 </div>
 {% endblock %}
 
@@ -81,10 +81,29 @@
 <script>
 	// Pass server-side data to JavaScript
 	window.rollCallPortalData = {
-		currentEmployee: {{ current_employee | tojson }},
+		currentEmployee: {{ (current_employee or "") | tojson }},
 		csrfToken: "{{ frappe.session.csrf_token }}",
-		isLoggedIn: {{ "true" if frappe.session.user != "Guest" else "false" }}
+		isLoggedIn: {{ "true" if frappe.session.user != "Guest" else "false" }},
+		userRoles: {{ (user_roles or []) | tojson }}
 	};
 </script>
-<script src="/assets/flexitime/js/roll_call_portal.js"></script>
+<!-- Load all the same modules as desk app -->
+<script src="/assets/flexitime/js/utils/date-utils.js"></script>
+<script src="/assets/flexitime/js/utils/color-utils.js"></script>
+<script src="/assets/flexitime/js/roll-call/utils/presence-utils.js"></script>
+<script src="/assets/flexitime/js/roll-call/shared/DateRangeCalculator.js"></script>
+<script src="/assets/flexitime/js/roll-call/grid/GridRenderer.js"></script>
+<script src="/assets/flexitime/js/roll-call/interactions/SelectionManager.js"></script>
+<script src="/assets/flexitime/js/roll-call/interactions/EventManager.js"></script>
+<script src="/assets/flexitime/js/roll-call/interactions/ClipboardManager.js"></script>
+<script src="/assets/flexitime/js/roll-call/interactions/UndoManager.js"></script>
+<script src="/assets/flexitime/js/roll-call/data/DataManager.js"></script>
+<script src="/assets/flexitime/js/roll-call/dialogs/PresenceDialog.js"></script>
+<script src="/assets/flexitime/js/roll-call/dialogs/LeaveDialogs.js"></script>
+<script src="/assets/flexitime/js/roll-call/dialogs/BulkDialog.js"></script>
+<script src="/assets/flexitime/js/roll-call/palette/PaletteRenderer.js"></script>
+<!-- Load the RollCallTable class (extracted for portal use) -->
+<script src="/assets/flexitime/js/roll-call/RollCallTable.js"></script>
+<!-- Portal wrapper that initializes using the same RollCallTable class -->
+<script src="/assets/flexitime/js/roll_call_portal_wrapper.js"></script>
 {% endblock %}

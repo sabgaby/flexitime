@@ -113,27 +113,66 @@ def get_active_employees():
 	)
 
 
-def is_timesheet_user(employee):
-	"""Check if employee is expected to use Timesheets
-
-	Args:
-		employee: Employee ID
+def get_employees_requiring_weekly_entry():
+	"""Get list of active employees who require weekly entries
 
 	Returns:
-		bool: True if employee should use Timesheets
+		list: Active Employee documents with requires_weekly_entry = 1 in Employee Presence Settings
 	"""
-	# Check if employee has custom field set
-	uses_timesheet = frappe.get_value("Employee", employee, "custom_uses_timesheet")
-	if uses_timesheet is not None:
-		return uses_timesheet
+	# Get employees from Employee Presence Settings where requires_weekly_entry = 1
+	settings = frappe.get_all("Employee Presence Settings",
+		filters={"requires_weekly_entry": 1},
+		fields=["employee"]
+	)
+	employee_names = [s.employee for s in settings] if settings else []
+	
+	if not employee_names:
+		return []
+	
+	# Get active employees matching those names
+	return frappe.get_all("Employee",
+		filters={"status": "Active", "name": ["in", employee_names]},
+		fields=["name", "employee_name", "user_id", "department", "holiday_list"]
+	)
 
-	# Fallback: check if they have any submitted timesheets
-	has_timesheets = frappe.db.exists("Timesheet", {
-		"employee": employee,
-		"docstatus": 1
-	})
 
-	return bool(has_timesheets)
+def get_employees_showing_in_roll_call(company=None, department=None):
+	"""Get list of active employees who should appear in roll call
+
+	Args:
+		company (str, optional): Filter by company
+		department (str, optional): Filter by department
+
+	Returns:
+		list: Active Employee documents with show_in_roll_call = 1 in Employee Presence Settings
+	"""
+	# Get employees from Employee Presence Settings where show_in_roll_call = 1
+	settings = frappe.get_all("Employee Presence Settings",
+		filters={"show_in_roll_call": 1},
+		fields=["employee"]
+	)
+	
+	employee_names = [s.employee for s in settings] if settings else []
+	
+	if not employee_names:
+		return []
+	
+	# Get active employees matching those names
+	# Use ignore_permissions=True to bypass permission restrictions
+	# This is safe because we're only reading basic employee info for roll call visibility
+	emp_filters = {"status": "Active", "name": ["in", employee_names]}
+	if company:
+		emp_filters["company"] = company
+	if department:
+		emp_filters["department"] = department
+	
+	employees = frappe.get_all("Employee",
+		filters=emp_filters,
+		fields=["name", "employee_name", "user_id", "department", "holiday_list"],
+		ignore_permissions=True
+	)
+	
+	return employees
 
 
 def format_date(date):
@@ -215,14 +254,14 @@ def get_leave_days_in_week(employee, week_start):
 	
 	Returns approved leave applications that overlap with the week,
 	with details about presence type, half-day status, and whether
-	they deduct from flexitime balance.
-	
+	the presence type expects work hours.
+
 	Args:
 		employee: Employee ID
 		week_start: Monday of the week (date object or string)
-		
+
 	Returns:
-		list: List of dicts with {date, presence_type, is_half_day, deducts_from_balance, leave_application}
+		list: List of dicts with {date, presence_type, is_half_day, expect_work_hours, leave_application}
 	"""
 	week_start = getdate(week_start)
 	week_end = add_days(week_start, 6)
@@ -245,14 +284,14 @@ def get_leave_days_in_week(employee, week_start):
 		# Get presence type for this leave type
 		presence_type = frappe.db.get_value("Presence Type",
 			{"leave_type": leave_app.leave_type, "requires_leave_application": 1},
-			["name", "deducts_from_flextime_balance"],
+			["name", "expect_work_hours"],
 			as_dict=True
 		)
-		
+
 		if not presence_type:
 			continue
-		
-		deducts_from_balance = presence_type.deducts_from_flextime_balance or 0
+
+		expect_work_hours = presence_type.expect_work_hours or 0
 		
 		# Iterate through each day of the leave
 		current_date = getdate(leave_app.from_date)
@@ -272,7 +311,7 @@ def get_leave_days_in_week(employee, week_start):
 					"date": current_date,
 					"presence_type": presence_type.name,
 					"is_half_day": is_half_day,
-					"deducts_from_balance": deducts_from_balance,
+					"expect_work_hours": expect_work_hours,
 					"leave_application": leave_app.name
 				})
 			
@@ -291,12 +330,12 @@ def calculate_weekly_expected_hours_with_holidays(employee, week_start):
 	3. Work days per week = count of days with > 0 hours in work pattern
 	4. Daily average = FTE_weekly_hours / work_days_per_week
 	5. Holidays count = count holidays in week (Mon-Sun) on work days
-	6. Regular leaves count = count regular leave days (deducts_from_balance=0) on work days
+	6. Regular leaves count = count leave days where expect_work_hours=0 on work days
 	7. Half-day leaves count = count half-day regular leaves on work days
 	8. Expected hours = FTE_weekly_hours - (holidays × daily_avg) - (regular_leaves × daily_avg) - (half_leaves × daily_avg/2)
-	
-	Note: Flex Off leaves (deducts_from_balance=1) do NOT reduce expected hours as they're
-	already accounted in the work pattern.
+
+	Note: Flex Off (expect_work_hours=1) does NOT reduce expected hours because it expects
+	work hours from the pattern - the employee is using their flexitime balance.
 	
 	Args:
 		employee: Employee ID
@@ -355,18 +394,19 @@ def calculate_weekly_expected_hours_with_holidays(employee, week_start):
 	# Get leave days in the week
 	leave_days = get_leave_days_in_week(employee, week_start)
 	
-	# Count regular leave days (deducts_from_balance = 0) and half-days
+	# Count leave days where expect_work_hours=0 (vacation, sick, etc.)
+	# Leaves with expect_work_hours=1 (Flex Off) don't reduce expected hours
 	regular_leaves_count = 0
 	half_leaves_count = 0
-	
+
 	for leave_day in leave_days:
 		date = leave_day["date"]
 		# Only count leaves that fall on work days
 		weekday = date.weekday()
 		if weekday < len(days_of_week) and (days_of_week[weekday] or 0) > 0:
-			# Flex Off (deducts_from_balance = 1) doesn't reduce expected hours
-			# They're already accounted in the work pattern
-			if not leave_day["deducts_from_balance"]:
+			# Flex Off (expect_work_hours=1) doesn't reduce expected hours
+			# because it expects work hours from the pattern
+			if not leave_day["expect_work_hours"]:
 				if leave_day["is_half_day"]:
 					half_leaves_count += 1
 				else:

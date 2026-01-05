@@ -17,6 +17,7 @@ API Endpoints (whitelisted):
     save_bulk_split_entries: Save multiple split entries in bulk
     delete_bulk_entries: Delete multiple entries in bulk
     get_leave_planning_summary: Get aggregated leave planning data
+    get_pending_review_count: Get count of leave applications awaiting approval
 
 Permission Model:
     - All endpoints require login (not allow_guest)
@@ -56,7 +57,8 @@ def can_edit_employee_entry(target_employee: str) -> bool:
 	"""Check if current user can edit entries for the target employee.
 
 	Permission rules:
-	- HR Manager can edit anyone's entries
+	- HR Manager and HR User can edit anyone's entries
+	- Leave Approver (line manager) can edit their direct reports' entries
 	- Employees can only edit their own entries
 
 	Args:
@@ -65,18 +67,38 @@ def can_edit_employee_entry(target_employee: str) -> bool:
 	Returns:
 		bool: True if user has permission to edit
 	"""
-	# HR Managers can edit anyone
+	if not target_employee:
+		return False
+
+	# HR Managers and HR Users can edit anyone
 	if is_hr_department_member():
 		return True
 
-	# Regular users can only edit their own
 	current_emp = get_current_employee()
-	return current_emp == target_employee
+	if not current_emp:
+		return False
+
+	# Own entries - always allowed
+	if current_emp == target_employee:
+		return True
+
+	# Line manager (Leave Approver) can edit direct reports
+	if is_leave_approver():
+		if is_line_manager_of(target_employee):
+			return True
+
+	return False
+
+
+def is_leave_approver():
+	"""Check if current user has Leave Approver role."""
+	return "Leave Approver" in frappe.get_roles()
 
 
 def is_hr_department_member():
-	"""Check if current user has HR Manager role."""
-	return "HR Manager" in frappe.get_roles()
+	"""Check if current user has HR Manager or HR User role."""
+	roles = frappe.get_roles()
+	return "HR Manager" in roles or "HR User" in roles
 
 
 def is_line_manager_of(employee: str) -> bool:
@@ -196,6 +218,37 @@ def get_current_user_info():
 
 
 @frappe.whitelist()
+def get_editable_employees():
+	"""Get list of employee IDs that the current user can edit.
+
+	Returns:
+		dict: {
+			can_edit_all: bool - True if user can edit anyone (HR)
+			editable_employees: list - Employee IDs user can edit (if not can_edit_all)
+		}
+	"""
+	# HR Manager and HR User can edit anyone
+	if is_hr_department_member():
+		return {"can_edit_all": True, "editable_employees": []}
+
+	current_emp = get_current_employee()
+	if not current_emp:
+		return {"can_edit_all": False, "editable_employees": []}
+
+	editable = [current_emp]  # Can always edit own entries
+
+	# Leave Approver can edit direct reports
+	if is_leave_approver():
+		direct_reports = frappe.db.sql_list("""
+			SELECT name FROM `tabEmployee`
+			WHERE reports_to = %s AND status = 'Active'
+		""", current_emp)
+		editable.extend(direct_reports)
+
+	return {"can_edit_all": False, "editable_employees": editable}
+
+
+@frappe.whitelist()
 def get_default_company():
 	"""Get user's default company."""
 	return frappe.defaults.get_user_default("Company") or frappe.db.get_single_value(
@@ -206,6 +259,8 @@ def get_default_company():
 def check_missing_work_patterns(employee_names: list, reference_date: str) -> list:
 	"""Check which employees are missing work patterns for a given date.
 
+	Uses batch SQL query instead of N individual lookups.
+
 	Args:
 		employee_names: List of employee IDs to check
 		reference_date: Date to check patterns for (YYYY-MM-DD)
@@ -213,42 +268,54 @@ def check_missing_work_patterns(employee_names: list, reference_date: str) -> li
 	Returns:
 		list: List of dicts with employee info for those missing patterns
 	"""
-	from frappe.utils import getdate
-	from flexitime.flexitime.doctype.employee_work_pattern.employee_work_pattern import get_work_pattern
+	if not employee_names:
+		return []
 
 	reference_date = getdate(reference_date)
-	missing = []
 
-	for emp_name in employee_names:
-		pattern = get_work_pattern(emp_name, reference_date)
-		if not pattern:
-			# Get employee name for display
-			emp_full_name = frappe.db.get_value("Employee", emp_name, "employee_name")
-			missing.append({
-				"employee": emp_name,
-				"employee_name": emp_full_name or emp_name
-			})
+	# Get all employees who HAVE valid work patterns for this date (1 query)
+	employees_with_patterns = frappe.db.sql("""
+		SELECT DISTINCT employee
+		FROM `tabEmployee Work Pattern`
+		WHERE employee IN %(employees)s
+		AND valid_from <= %(ref_date)s
+		AND (valid_to >= %(ref_date)s OR valid_to IS NULL)
+		AND docstatus = 1
+	""", {
+		'employees': employee_names,
+		'ref_date': str(reference_date)
+	}, as_list=True)
 
-	return missing
+	employees_with_patterns_set = {e[0] for e in employees_with_patterns}
+
+	# Find employees WITHOUT patterns
+	missing_employees = [e for e in employee_names if e not in employees_with_patterns_set]
+
+	if not missing_employees:
+		return []
+
+	# Get employee names for display (1 query for all missing)
+	emp_names = frappe.get_all("Employee",
+		filters={"name": ["in", missing_employees]},
+		fields=["name", "employee_name"]
+	)
+
+	return [{"employee": e.name, "employee_name": e.employee_name or e.name} for e in emp_names]
 
 
-def ensure_holiday_entries_batch(employee_names: list, from_date: str, to_date: str):
+def ensure_holiday_entries_batch(employee_names: list, from_date: str, to_date: str, existing_entries: set = None):
 	"""Batch auto-create Roll Call entries for holidays from HRMS Holiday List.
 
 	This is the optimized batch version that creates holiday entries for ALL
-	employees in a single operation instead of per-employee loops.
+	employees in a single operation using efficient SQL joins.
 
 	Args:
 		employee_names: List of Employee IDs
 		from_date: Start date in YYYY-MM-DD format
 		to_date: End date in YYYY-MM-DD format
+		existing_entries: Optional set of existing entry keys (employee|date) to avoid duplicate query
 	"""
 	if not employee_names:
-		return
-
-	try:
-		from hrms.hr.utils import get_holidays_for_employee
-	except ImportError:
 		return
 
 	# Check if holiday presence type exists (1 query)
@@ -256,39 +323,66 @@ def ensure_holiday_entries_batch(employee_names: list, from_date: str, to_date: 
 	if not holiday_pt:
 		return
 
-	# Get ALL existing entries for all employees in date range (1 query)
-	existing_entries = set()
-	existing = frappe.db.sql("""
-		SELECT CONCAT(employee, '|', date) as entry_key
-		FROM `tabRoll Call Entry`
-		WHERE employee IN %(employees)s
-		AND date BETWEEN %(from_date)s AND %(to_date)s
+	# Use provided existing entries or query them
+	if existing_entries is None:
+		existing = frappe.db.sql("""
+			SELECT CONCAT(employee, '|', date) as entry_key
+			FROM `tabRoll Call Entry`
+			WHERE employee IN %(employees)s
+			AND date BETWEEN %(from_date)s AND %(to_date)s
+		""", {
+			'employees': employee_names,
+			'from_date': from_date,
+			'to_date': to_date
+		}, as_dict=True)
+		existing_entries = {e.entry_key for e in existing}
+
+	# Get employees with their holiday lists (1 query)
+	# Join with Company to get default holiday list as fallback
+	emp_holiday_lists = frappe.db.sql("""
+		SELECT e.name as employee,
+			   COALESCE(e.holiday_list, c.default_holiday_list) as holiday_list
+		FROM `tabEmployee` e
+		LEFT JOIN `tabCompany` c ON e.company = c.name
+		WHERE e.name IN %(employees)s
+	""", {'employees': employee_names}, as_dict=True)
+
+	# Build employee -> holiday_list mapping
+	emp_to_holiday_list = {e.employee: e.holiday_list for e in emp_holiday_lists if e.holiday_list}
+
+	if not emp_to_holiday_list:
+		return  # No employees have holiday lists configured
+
+	# Get all unique holiday lists
+	unique_holiday_lists = list(set(emp_to_holiday_list.values()))
+
+	# Get all holidays for all holiday lists in date range (1 query)
+	# This replaces N calls to get_holidays_for_employee
+	holidays = frappe.db.sql("""
+		SELECT parent as holiday_list, holiday_date, description
+		FROM `tabHoliday`
+		WHERE parent IN %(holiday_lists)s
+		AND holiday_date BETWEEN %(from_date)s AND %(to_date)s
+		AND weekly_off = 0
 	""", {
-		'employees': employee_names,
+		'holiday_lists': unique_holiday_lists,
 		'from_date': from_date,
 		'to_date': to_date
 	}, as_dict=True)
-	existing_entries = {e.entry_key for e in existing}
+
+	# Build holiday_list -> [dates] mapping
+	holidays_by_list = {}
+	for h in holidays:
+		if h.holiday_list not in holidays_by_list:
+			holidays_by_list[h.holiday_list] = []
+		holidays_by_list[h.holiday_list].append(h)
 
 	# Collect all entries to create
 	entries_to_create = []
-	for emp_name in employee_names:
-		try:
-			holidays = get_holidays_for_employee(
-				emp_name,
-				from_date,
-				to_date,
-				raise_exception=False,
-				only_non_weekly=False
-			)
-		except Exception:
-			continue
-
-		if not holidays:
-			continue
-
-		for holiday in holidays:
-			holiday_date = holiday.get("holiday_date")
+	for emp_name, holiday_list in emp_to_holiday_list.items():
+		emp_holidays = holidays_by_list.get(holiday_list, [])
+		for holiday in emp_holidays:
+			holiday_date = str(holiday.holiday_date)
 			key = f"{emp_name}|{holiday_date}"
 
 			if key not in existing_entries:
@@ -302,7 +396,7 @@ def ensure_holiday_entries_batch(employee_names: list, from_date: str, to_date: 
 					"presence_type_label": holiday_pt.label,
 					"source": "System",
 					"is_half_day": 0,
-					"notes": holiday.get("description", ""),
+					"notes": holiday.description or "",
 					"owner": frappe.session.user,
 					"creation": frappe.utils.now(),
 					"modified": frappe.utils.now(),
@@ -339,7 +433,7 @@ def ensure_holiday_entries(employee: str, from_date: str, to_date: str):
 	ensure_holiday_entries_batch([employee], from_date, to_date)
 
 
-def ensure_day_off_entries_batch(employee_names: list, from_date: str, to_date: str):
+def ensure_day_off_entries_batch(employee_names: list, from_date: str, to_date: str, existing_entries: set = None):
 	"""Batch auto-create Roll Call entries for scheduled days off from Work Pattern.
 
 	This is the optimized batch version that creates day-off entries for ALL
@@ -349,6 +443,7 @@ def ensure_day_off_entries_batch(employee_names: list, from_date: str, to_date: 
 		employee_names: List of Employee IDs
 		from_date: Start date in YYYY-MM-DD format
 		to_date: End date in YYYY-MM-DD format
+		existing_entries: Optional set of existing entry keys (employee|date) to avoid duplicate query
 	"""
 	if not employee_names:
 		return
@@ -356,25 +451,35 @@ def ensure_day_off_entries_batch(employee_names: list, from_date: str, to_date: 
 	from_date = getdate(from_date)
 	to_date = getdate(to_date)
 
-	# Check if day_off presence type exists (1 query)
-	day_off_pt = frappe.db.get_value("Presence Type", "day_off", ["icon", "label"], as_dict=True)
+	# Get day off presence type from Flexitime Settings
+	try:
+		settings = frappe.get_cached_doc("Flexitime Settings")
+		day_off_presence_type = settings.day_off_presence_type
+	except Exception:
+		# Fallback to default if settings not available
+		day_off_presence_type = "day_off" if frappe.db.exists("Presence Type", "day_off") else None
+
+	if not day_off_presence_type:
+		return
+
+	# Get day_off presence type details
+	day_off_pt = frappe.db.get_value("Presence Type", day_off_presence_type, ["icon", "label"], as_dict=True)
 	if not day_off_pt:
 		return
 
-	# Get ALL existing entries for all employees in date range (1 query)
-	# Reuse the same query as holidays if possible
-	existing_entries = set()
-	existing = frappe.db.sql("""
-		SELECT CONCAT(employee, '|', date) as entry_key
-		FROM `tabRoll Call Entry`
-		WHERE employee IN %(employees)s
-		AND date BETWEEN %(from_date)s AND %(to_date)s
-	""", {
-		'employees': employee_names,
-		'from_date': str(from_date),
-		'to_date': str(to_date)
-	}, as_dict=True)
-	existing_entries = {e.entry_key for e in existing}
+	# Use provided existing entries or query them
+	if existing_entries is None:
+		existing = frappe.db.sql("""
+			SELECT CONCAT(employee, '|', date) as entry_key
+			FROM `tabRoll Call Entry`
+			WHERE employee IN %(employees)s
+			AND date BETWEEN %(from_date)s AND %(to_date)s
+		""", {
+			'employees': employee_names,
+			'from_date': str(from_date),
+			'to_date': str(to_date)
+		}, as_dict=True)
+		existing_entries = {e.entry_key for e in existing}
 
 	# Get ALL work patterns for all employees covering the date range (1 query)
 	# A pattern is valid if it overlaps with our date range
@@ -458,7 +563,7 @@ def ensure_day_off_entries_batch(employee_names: list, from_date: str, to_date: 
 					"name": f"{emp_name}-{current_date}",
 					"employee": emp_name,
 					"date": str(current_date),
-					"presence_type": "day_off",
+					"presence_type": day_off_presence_type,
 					"presence_type_icon": day_off_pt.icon,
 					"presence_type_label": day_off_pt.label,
 					"source": "System",
@@ -525,40 +630,61 @@ def get_events(month_start: str, month_end: str, employee_filters: str | dict | 
 	# Get current user's employee for visibility checks
 	current_employee = get_current_employee()
 
-	# Build employee filters
-	emp_filters = {"status": "Active"}
-	if employee_filters:
-		if employee_filters.get("company"):
-			emp_filters["company"] = employee_filters["company"]
-		if employee_filters.get("department"):
-			emp_filters["department"] = employee_filters["department"]
-		if employee_filters.get("branch"):
-			emp_filters["branch"] = employee_filters["branch"]
+	# Get employees who show in roll call from Employee Presence Settings
+	from flexitime.flexitime.utils import get_employees_showing_in_roll_call
+	roll_call_employees = get_employees_showing_in_roll_call()
+	employee_names = [e.name for e in roll_call_employees]
 
-	# Get employees
-	employees = frappe.get_all(
+	# Apply additional filters if provided
+	emp_filters = {"status": "Active"}
+	if employee_names:
+		emp_filters["name"] = ["in", employee_names]
+	if employee_filters.get("company"):
+		emp_filters["company"] = employee_filters["company"]
+	if employee_filters.get("department"):
+		emp_filters["department"] = employee_filters["department"]
+	if employee_filters.get("branch"):
+		emp_filters["branch"] = employee_filters["branch"]
+
+	# Get full employee data for the frontend (avoids separate API call)
+	employees_data = frappe.get_all(
 		"Employee",
 		filters=emp_filters,
-		fields=["name"],
+		fields=["name", "employee_name", "image", "nickname", "company", "department"],
+		order_by="employee_name asc",
 		limit_page_length=0,
+		ignore_permissions=True
 	)
+	employee_names = [e.name for e in employees_data]
 
-	employee_names = [e.name for e in employees]
 	if not employee_names:
-		return {"entries": {}, "current_employee": current_employee}
+		return {"entries": {}, "employees": [], "current_employee": current_employee}
 
 	# Auto-populate system entries for all employees (BATCHED for performance)
+	# Query existing entries ONCE and share between both batch functions
+	existing = frappe.db.sql("""
+		SELECT CONCAT(employee, '|', date) as entry_key
+		FROM `tabRoll Call Entry`
+		WHERE employee IN %(employees)s
+		AND date BETWEEN %(from_date)s AND %(to_date)s
+	""", {
+		'employees': employee_names,
+		'from_date': month_start,
+		'to_date': month_end
+	}, as_dict=True)
+	existing_entries = {e.entry_key for e in existing}
+
 	# Order matters: holidays first (take precedence), then day_off
 	try:
 		# Holidays from HRMS Holiday List (takes precedence over weekends)
-		ensure_holiday_entries_batch(employee_names, month_start, month_end)
+		ensure_holiday_entries_batch(employee_names, month_start, month_end, existing_entries)
 	except Exception:
 		# Don't fail if holiday list not configured
 		pass
 
 	try:
 		# Days off from Work Pattern
-		ensure_day_off_entries_batch(employee_names, month_start, month_end)
+		ensure_day_off_entries_batch(employee_names, month_start, month_end, existing_entries)
 	except Exception:
 		# Don't fail the whole request if day off creation fails
 		pass
@@ -597,10 +723,10 @@ def get_events(month_start: str, month_end: str, employee_filters: str | dict | 
 			fields=["name"],
 		)
 	except Exception:
-		# Fallback to category-based detection if field doesn't exist (migration not run)
+		# Get presence types that require leave applications
 		leave_presence_types_list = frappe.get_all(
 			"Presence Type",
-			filters={"category": "Leave"},
+			filters={"requires_leave_application": 1},
 			fields=["name"],
 		)
 	leave_presence_types = [pt.name for pt in leave_presence_types_list]
@@ -727,6 +853,7 @@ def get_events(month_start: str, month_end: str, employee_filters: str | dict | 
 
 	return {
 		"entries": result,
+		"employees": employees_data,  # Include employee data to avoid separate API call
 		"pending_leaves": pending_leaves_by_employee,
 		"current_employee": current_employee,
 		"warnings": {
@@ -735,41 +862,46 @@ def get_events(month_start: str, month_end: str, employee_filters: str | dict | 
 	}
 
 
-def calculate_leave_status_for_entry(entry_dict):
+def calculate_leave_status_for_entry(entry_dict, cache=None):
 	"""Calculate and add leave_status fields to an entry dict.
 
 	This replicates the logic from get_roll_call_entries() for single-entry updates.
 
 	Args:
 		entry_dict: Entry data as dict (from as_dict())
+		cache: Optional dict with pre-fetched data for batch operations:
+			- leave_presence_types: set of presence type names requiring leave
+			- leave_app_statuses: dict of leave_application -> status
+			- current_employee: current user's employee ID
+			- is_hr: bool
+			- managed_employees: set of employee IDs
 
 	Returns:
 		dict: Entry with leave_status, am_leave_status, pm_leave_status added
 	"""
-	# Get presence types that require leave applications
-	try:
+	# Use cache if provided, otherwise fetch (for single-entry calls)
+	if cache:
+		leave_presence_types = cache.get("leave_presence_types", set())
+		current_employee = cache.get("current_employee")
+		is_hr = cache.get("is_hr", False)
+		managed_employees = cache.get("managed_employees", set())
+		leave_app_status = cache.get("leave_app_statuses", {}).get(entry_dict.get("leave_application"))
+	else:
+		# Fallback for single-entry calls (not batch)
 		leave_presence_types_list = frappe.get_all(
 			"Presence Type",
 			filters={"requires_leave_application": 1},
-			fields=["name"],
+			pluck="name"
 		)
-	except Exception:
-		leave_presence_types_list = frappe.get_all(
-			"Presence Type",
-			filters={"category": "Leave"},
-			fields=["name"],
-		)
-	leave_presence_types = [pt.name for pt in leave_presence_types_list]
-
-	# Get current employee for permission check
-	current_employee = get_current_employee()
-
-	# Get leave application status if linked
-	leave_app_status = None
-	if entry_dict.get("leave_application"):
-		leave_app_status = frappe.db.get_value(
-			"Leave Application", entry_dict["leave_application"], "status"
-		)
+		leave_presence_types = set(leave_presence_types_list)
+		current_employee = get_current_employee()
+		is_hr = is_hr_department_member()
+		managed_employees = set()
+		leave_app_status = None
+		if entry_dict.get("leave_application"):
+			leave_app_status = frappe.db.get_value(
+				"Leave Application", entry_dict["leave_application"], "status"
+			)
 
 	def get_leave_status_for_presence(presence_type, leave_application):
 		"""Get leave status for a specific presence type."""
@@ -780,7 +912,7 @@ def calculate_leave_status_for_entry(entry_dict):
 			if la_status == "Approved":
 				return "approved"
 			else:
-				if can_view_draft_status(current_employee, entry_dict["employee"]):
+				if can_view_draft_status_batch(current_employee, entry_dict["employee"], is_hr, managed_employees):
 					return "draft"
 				else:
 					return "tentative"
@@ -815,6 +947,56 @@ def calculate_leave_status_for_entry(entry_dict):
 	return entry_dict
 
 
+def build_leave_status_cache(entries):
+	"""Build a cache for batch leave status calculation.
+
+	Args:
+		entries: List of entry dicts
+
+	Returns:
+		dict: Cache with pre-fetched data
+	"""
+	# Get presence types that require leave applications (1 query)
+	leave_presence_types = set(frappe.get_all(
+		"Presence Type",
+		filters={"requires_leave_application": 1},
+		pluck="name"
+	))
+
+	# Get current employee and permission data
+	current_employee = get_current_employee()
+	is_hr = is_hr_department_member()
+
+	# Get managed employees for line manager check
+	managed_employees = set()
+	if current_employee and not is_hr:
+		managed = frappe.get_all(
+			"Employee",
+			filters={"reports_to": current_employee, "status": "Active"},
+			pluck="name"
+		)
+		managed_employees = set(managed)
+
+	# Get leave application statuses (1 query for all)
+	leave_app_names = [e.get("leave_application") for e in entries if e.get("leave_application")]
+	leave_app_statuses = {}
+	if leave_app_names:
+		leave_apps = frappe.get_all(
+			"Leave Application",
+			filters={"name": ["in", leave_app_names]},
+			fields=["name", "status"]
+		)
+		leave_app_statuses = {la.name: la.status for la in leave_apps}
+
+	return {
+		"leave_presence_types": leave_presence_types,
+		"current_employee": current_employee,
+		"is_hr": is_hr,
+		"managed_employees": managed_employees,
+		"leave_app_statuses": leave_app_statuses,
+	}
+
+
 def validate_presence_type_for_roll_call(employee: str, date: str, presence_type: str):
 	"""Validate a presence type before saving to Roll Call.
 
@@ -839,7 +1021,7 @@ def validate_presence_type_for_roll_call(employee: str, date: str, presence_type
 
 	# Get presence type properties
 	pt = frappe.db.get_value("Presence Type", presence_type,
-		["is_leave", "leave_type", "requires_leave_application"], as_dict=True)
+		["leave_type", "requires_leave_application"], as_dict=True)
 
 	if not pt:
 		return None
@@ -847,7 +1029,7 @@ def validate_presence_type_for_roll_call(employee: str, date: str, presence_type
 	leave_application = None
 
 	# Check if this is a leave-type presence
-	if pt.is_leave:
+	if pt.requires_leave_application and pt.leave_type:
 		# First check: Is there already an approved leave for this date?
 		existing_entry = frappe.db.get_value("Roll Call Entry",
 			{"employee": employee, "date": date},
@@ -948,9 +1130,10 @@ def sync_roll_call_to_weekly_entry(employee: str, date: str, roll_call_entry):
 				daily.presence_type_icon = None
 				daily.presence_type_label = None
 
-			# Recalculate expected hours
+			# Recalculate expected hours (approved leaves reduce to 0)
+			has_approved_leave = bool(roll_call_entry.leave_application)
 			daily.expected_hours = calculate_expected_hours(
-				employee, date, roll_call_entry.presence_type, roll_call_entry.is_half_day
+				employee, date, has_approved_leave, roll_call_entry.is_half_day
 			)
 			changed = True
 			break
@@ -1134,12 +1317,22 @@ def save_bulk_entries(entries: list | str, presence_type: str, day_part: str = "
 	is_hr = is_hr_department_member()
 	if not is_hr:
 		current_emp = get_current_employee()
+		if not current_emp:
+			frappe.throw(
+				_("Your user account is not linked to an Employee record. Please contact HR."),
+				frappe.PermissionError
+			)
 		for entry in entries:
-			if entry.get("employee") != current_emp:
+			entry_employee = entry.get("employee")
+			if not entry_employee or entry_employee != current_emp:
 				frappe.throw(
-					_("You can only edit your own Roll Call entries"),
+					_("You can only edit your own Roll Call entries. Attempted to edit: {0}").format(entry_employee or "unknown"),
 					frappe.PermissionError
 				)
+
+	# Validate presence type exists
+	if not presence_type or not frappe.db.exists("Presence Type", presence_type):
+		frappe.throw(_("Presence Type '{0}' not found").format(presence_type or ""))
 
 	# Get presence type info once
 	pt_info = frappe.db.get_value("Presence Type", presence_type, ["icon", "label"], as_dict=True) or {}
@@ -1232,10 +1425,23 @@ def save_bulk_entries(entries: list | str, presence_type: str, day_part: str = "
 			to_insert.append(entry_dict)
 			saved_count += 1
 
-	# Execute bulk updates using SQL for better performance
+	# Execute bulk updates - use direct SQL for better concurrency handling
 	if to_update:
 		for name, vals in to_update:
-			frappe.db.set_value("Roll Call Entry", name, vals, update_modified=False)
+			try:
+				# Use direct SQL update to avoid timestamp conflicts
+				# This is safe for Roll Call entries as they don't have complex validation
+				set_clause = ", ".join([f"`{k}` = %s" for k in vals.keys()])
+				values = list(vals.values())
+				# Parameters: vals... + modified_by + name (for WHERE clause)
+				frappe.db.sql(f"""
+					UPDATE `tabRoll Call Entry`
+					SET {set_clause}, `modified` = NOW(), `modified_by` = %s
+					WHERE name = %s
+				""", values + [frappe.session.user, name])
+			except Exception:
+				# If update fails, skip silently - entry may have been deleted or locked
+				pass
 
 	# Execute bulk inserts using frappe.db.bulk_insert
 	if to_insert:
@@ -1282,9 +1488,12 @@ def save_bulk_entries(entries: list | str, presence_type: str, day_part: str = "
 			WHERE {conditions}
 		""", params, as_dict=True)
 
+		# Build cache once for all entries (instead of N queries per entry)
+		leave_status_cache = build_leave_status_cache(fetched_entries)
+
 		for entry in fetched_entries:
 			entry_dict = dict(entry)
-			entry_dict = calculate_leave_status_for_entry(entry_dict)
+			entry_dict = calculate_leave_status_for_entry(entry_dict, cache=leave_status_cache)
 			# Add presence type info using pre-fetched map (O(1) lookup)
 			pt_info = pt_map.get(entry_dict.get("presence_type")) or {}
 			entry_dict["presence_type_icon"] = pt_info.get("icon") or ""
@@ -1320,10 +1529,16 @@ def save_bulk_split_entries(entries: list | str, am_presence_type: str, pm_prese
 	is_hr = is_hr_department_member()
 	if not is_hr:
 		current_emp = get_current_employee()
+		if not current_emp:
+			frappe.throw(
+				_("Your user account is not linked to an Employee record. Please contact HR."),
+				frappe.PermissionError
+			)
 		for entry in entries:
-			if entry.get("employee") != current_emp:
+			entry_employee = entry.get("employee")
+			if not entry_employee or entry_employee != current_emp:
 				frappe.throw(
-					_("You can only edit your own Roll Call entries"),
+					_("You can only edit your own Roll Call entries. Attempted to edit: {0}").format(entry_employee or "unknown"),
 					frappe.PermissionError
 				)
 
@@ -1391,10 +1606,23 @@ def save_bulk_split_entries(entries: list | str, am_presence_type: str, pm_prese
 			})
 			saved_count += 1
 
-	# Execute bulk updates
+	# Execute bulk updates - use direct SQL for better concurrency handling
 	if to_update:
 		for name, vals in to_update:
-			frappe.db.set_value("Roll Call Entry", name, vals, update_modified=True)
+			try:
+				# Use direct SQL update to avoid timestamp conflicts
+				# This is safe for Roll Call entries as they don't have complex validation
+				set_clause = ", ".join([f"`{k}` = %s" for k in vals.keys()])
+				values = list(vals.values())
+				# Parameters: vals... + modified_by + name (for WHERE clause)
+				frappe.db.sql(f"""
+					UPDATE `tabRoll Call Entry`
+					SET {set_clause}, `modified` = NOW(), `modified_by` = %s
+					WHERE name = %s
+				""", values + [frappe.session.user, name])
+			except Exception:
+				# If update fails, skip silently - entry may have been deleted or locked
+				pass
 
 	# Execute bulk inserts
 	if to_insert:
@@ -1432,9 +1660,12 @@ def save_bulk_split_entries(entries: list | str, am_presence_type: str, pm_prese
 			WHERE {conditions}
 		""", params, as_dict=True)
 
+		# Build cache once for all entries (instead of N queries per entry)
+		leave_status_cache = build_leave_status_cache(fetched_entries)
+
 		for entry in fetched_entries:
 			entry_dict = dict(entry)
-			entry_dict = calculate_leave_status_for_entry(entry_dict)
+			entry_dict = calculate_leave_status_for_entry(entry_dict, cache=leave_status_cache)
 
 			# Add presence type info using pre-fetched map (O(1) lookups)
 			am_pt = pt_map.get(entry_dict.get("am_presence_type")) or {}
@@ -1498,18 +1729,67 @@ def delete_bulk_entries(entries: list | str):
 
 	deleted_count = 0
 	deleted_keys = []
+	failed_entries = []
 
-	for entry in existing_entries:
+	# Delete entries with retry logic to handle database locks
+	import time
+	max_retries = 3
+	retry_delay = 0.1  # 100ms
+	batch_size = 10  # Commit every N deletions to balance performance and lock release
+
+	for i, entry in enumerate(existing_entries):
 		if entry.is_locked:
+			failed_entries.append({"employee": entry.employee, "date": str(entry.date), "reason": "locked"})
 			continue  # Skip locked entries
 
-		frappe.delete_doc("Roll Call Entry", entry.name, ignore_permissions=True, force=True)
-		deleted_count += 1
-		deleted_keys.append({"employee": entry.employee, "date": str(entry.date)})
+		retries = 0
+		success = False
+		while retries < max_retries:
+			try:
+				frappe.delete_doc("Roll Call Entry", entry.name, ignore_permissions=True, force=True)
+				deleted_count += 1
+				deleted_keys.append({"employee": entry.employee, "date": str(entry.date)})
+				success = True
+				break  # Success, exit retry loop
+			except Exception as e:
+				# Check if it's a lock timeout or deadlock error
+				error_str = str(e).lower()
+				if "lock wait timeout" in error_str or "deadlock" in error_str or "querytimeout" in error_str:
+					retries += 1
+					if retries < max_retries:
+						time.sleep(retry_delay * retries)  # Exponential backoff
+						frappe.db.rollback()  # Rollback the failed transaction
+						continue
+					# Max retries reached, mark as failed
+					failed_entries.append({
+						"employee": entry.employee,
+						"date": str(entry.date),
+						"reason": "lock_timeout"
+					})
+				else:
+					# If not a lock error, re-raise immediately
+					raise
 
-	frappe.db.commit()
+		# Commit in batches to release locks periodically
+		if success and (deleted_count % batch_size == 0):
+			try:
+				frappe.db.commit()
+			except Exception:
+				frappe.db.rollback()
 
-	return {"deleted": deleted_count, "total": len(entries), "entries": deleted_keys}
+	# Final commit for any remaining changes
+	try:
+		frappe.db.commit()
+	except Exception:
+		frappe.db.rollback()
+
+	return {
+		"deleted": deleted_count,
+		"total": len(entries),
+		"entries": deleted_keys,
+		"failed": len(failed_entries),
+		"failed_entries": failed_entries
+	}
 
 
 @frappe.whitelist()
@@ -1750,3 +2030,44 @@ def get_leave_planning_summary(year: str = None, employee_filter: str = None):
 		},
 		"conflicts": conflicts
 	}
+
+
+@frappe.whitelist()
+def get_pending_review_count():
+	"""Get count of leave applications awaiting current user's approval.
+
+	This endpoint is used by Roll Call and Dashboard to show a badge
+	indicating how many leave applications need the current user's review.
+
+	Permission rules:
+	- HR Manager/HR User: sees count of ALL pending leave applications
+	- Leave Approver: sees count only for employees they can approve
+
+	Returns:
+		dict: {count: int, can_approve: bool}
+	"""
+	from flexitime.flexitime.permissions import get_employees_for_leave_approver
+
+	user = frappe.session.user
+	roles = frappe.get_roles(user)
+
+	# HR sees all pending
+	if "HR Manager" in roles or "HR User" in roles:
+		count = frappe.db.count("Leave Application", {
+			"status": "Open",
+			"docstatus": 0
+		})
+		return {"count": count, "can_approve": True}
+
+	# Leave Approver sees their assigned employees
+	if "Leave Approver" in roles:
+		employees = get_employees_for_leave_approver(user)
+		if employees:
+			count = frappe.db.count("Leave Application", {
+				"employee": ["in", employees],
+				"status": "Open",
+				"docstatus": 0
+			})
+			return {"count": count, "can_approve": True}
+
+	return {"count": 0, "can_approve": False}

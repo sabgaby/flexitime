@@ -1,0 +1,205 @@
+/**
+ * Base Roll Call Grid Styles
+ * 
+ * Shared styles for the roll call grid table used by both desk and portal.
+ * The grid table itself is custom HTML, but uses Frappe's CSS variables
+ * for consistent theming.
+ */
+
+/* ============================================
+   Base Grid Structure
+   ============================================ */
+
+/* Support both desk (.roll-call-table) and portal (.roll-call-grid) class names */
+.roll-call-table,
+.roll-call-grid {
+	width: 100%;
+	border-collapse: separate;
+	border-spacing: 0;
+	font-size: var(--text-sm, 0.875rem);
+}
+
+.roll-call-table thead,
+.roll-call-grid thead {
+	position: sticky;
+	top: 0;
+	z-index: 5;
+	background: var(--fg-color, #ffffff);
+}
+
+.roll-call-table tbody,
+.roll-call-grid tbody {
+	background: var(--fg-color, #ffffff);
+}
+
+/* ============================================
+   Grid Headers
+   ============================================ */
+
+.roll-call-table .month-row th,
+.roll-call-grid .month-row th {
+	padding: var(--padding-sm, 0.5rem);
+	text-align: center;
+	font-weight: 600;
+	font-size: var(--text-base, 1rem);
+	color: var(--heading-color, #1a1a1a);
+	border-bottom: 2px solid var(--border-color, #e5e7eb);
+	background: var(--fg-color, #ffffff);
+}
+
+.roll-call-table .day-row th,
+.roll-call-grid .day-row th {
+	padding: var(--grid-cell-padding, 4px);
+	text-align: center;
+	font-weight: 500;
+	min-width: var(--grid-cell-min-width, 44px);
+	border-bottom: 1px solid var(--border-color, #e5e7eb);
+	background: var(--fg-color, #ffffff);
+}
+
+.roll-call-table .employee-col,
+.roll-call-grid .employee-col {
+	padding: var(--padding-sm, 0.5rem);
+	min-width: var(--grid-employee-col-width, 180px);
+	text-align: left;
+	font-weight: 500;
+	background: var(--fg-color, #ffffff);
+	border-right: 2px solid var(--border-color, #e5e7eb);
+	position: sticky;
+	left: 0;
+	z-index: 3;
+}
+
+/* ============================================
+   Grid Cells
+   ============================================ */
+
+.roll-call-table .day-cell,
+.roll-call-grid .day-cell {
+	padding: var(--grid-cell-padding, 4px);
+	min-width: var(--grid-cell-min-width, 44px);
+	height: 32px;
+	text-align: center;
+	vertical-align: middle;
+	border: 1px solid var(--border-color, #e5e7eb);
+	background: var(--fg-color, #ffffff);
+	cursor: default;
+	position: relative;
+	/* Ensure cells can contain absolutely positioned split-cell */
+	overflow: hidden;
+}
+
+.roll-call-table .day-cell.today,
+.roll-call-grid .day-cell.today {
+	background: var(--cell-today-bg, var(--bg-yellow));
+}
+
+.roll-call-table .day-cell.weekend,
+.roll-call-grid .day-cell.weekend {
+	background: var(--cell-weekend-bg, var(--bg-light-gray));
+}
+
+.roll-call-table .day-cell.editable,
+.roll-call-grid .day-cell.editable {
+	cursor: pointer;
+}
+
+.roll-call-table .day-cell.editable:hover,
+.roll-call-grid .day-cell.editable:hover {
+	background: var(--cell-hover-bg, var(--bg-light-gray));
+	border-color: var(--cell-editable-border, var(--border-color));
+}
+
+.roll-call-table .day-cell.selected,
+.roll-call-grid .day-cell.selected {
+	background: var(--cell-selected-bg, var(--bg-blue));
+	border-color: var(--cell-selected-bg, var(--bg-blue));
+}
+
+.roll-call-table .day-cell.has-entry,
+.roll-call-grid .day-cell.has-entry {
+	/* Presence color is set via inline style --presence-color */
+	/* No border-radius - color should fill the entire square cell */
+	border-radius: 0;
+}
+
+/* ============================================
+   Presence Icons
+   ============================================ */
+
+.roll-call-table .presence-icon,
+.roll-call-grid .presence-icon {
+	display: inline-block;
+	font-size: 1rem;
+	line-height: 1;
+}
+
+/* ============================================
+   Split Day Cells (AM/PM)
+   ============================================ */
+
+.roll-call-table .day-cell.split-day,
+.roll-call-grid .day-cell.split-day {
+	padding: 0;
+	height: 32px;
+	/* Remove default flex display - split-cell will handle layout */
+}
+
+.roll-call-table .day-cell.split-day .split-cell,
+.roll-call-grid .day-cell.split-day .split-cell {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	width: 100%;
+	margin: 0;
+	padding: 0;
+}
+
+.roll-call-table .day-cell .split-am,
+.roll-call-table .day-cell .split-pm,
+.roll-call-grid .day-cell .split-am,
+.roll-call-grid .day-cell .split-pm {
+	flex: 1 1 50%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 0.75rem;
+	margin: 0;
+	padding: 0;
+	/* No border-radius - color should fill the entire half-cell */
+	border-radius: 0;
+	/* Presence color is set via inline style --presence-color */
+	min-height: 0;
+}
+
+.roll-call-table .day-cell .split-am,
+.roll-call-grid .day-cell .split-am {
+	border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+/* ============================================
+   Responsive Adjustments
+   ============================================ */
+
+@media (max-width: 768px) {
+	.roll-call-table,
+	.roll-call-grid {
+		font-size: var(--text-xs, 0.75rem);
+	}
+	
+	.roll-call-table .day-cell,
+	.roll-call-grid .day-cell {
+		min-width: 36px;
+		height: 28px;
+	}
+	
+	.roll-call-table .employee-col,
+	.roll-call-grid .employee-col {
+		min-width: 120px;
+	}
+}

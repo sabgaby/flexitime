@@ -1,7 +1,7 @@
 [project]
 name = "flexitime"
 authors = [
-    { name = "Gaby", email = "gaby@swisscluster.ch"}
+    { name = "Gabs" }
 ]
 description = "Swiss-compliant time tracking with flexitime balance management"
 requires-python = ">=3.10"

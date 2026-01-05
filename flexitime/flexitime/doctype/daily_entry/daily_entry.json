@@ -68,7 +68,7 @@
    "fieldname": "difference",
    "fieldtype": "Float",
    "in_list_view": 1,
-   "label": "Diff",
+   "label": "Delta",
    "precision": "1",
    "read_only": 1
   },

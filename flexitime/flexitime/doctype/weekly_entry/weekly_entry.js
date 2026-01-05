@@ -138,7 +138,8 @@ frappe.ui.form.on('Weekly Entry', {
 						row.date = day.date;
 						row.day_of_week = day.day_of_week;
 						row.expected_hours = day.expected_hours;
-						row.actual_hours = day.actual_hours || day.expected_hours;
+						// Do not auto-fill actual_hours - only use value from server if it exists
+						row.actual_hours = day.actual_hours || 0;
 						row.presence_type = day.presence_type;
 						row.presence_type_icon = day.presence_type_icon;
 						row.presence_type_label = day.presence_type_label;

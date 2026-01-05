@@ -29,6 +29,7 @@ class FlexitimeDashboard {
 	make() {
 		this.wrapper.html(`
 			<div class="flexitime-dashboard">
+				<div class="pending-review-container mb-4"></div>
 				<div class="number-cards-container mb-4"></div>
 				<div class="chart-container mb-4"></div>
 				<div class="row mb-4">
@@ -79,6 +80,7 @@ class FlexitimeDashboard {
 
 		try {
 			await Promise.all([
+				this.load_pending_review(),
 				this.load_number_cards(),
 				this.load_today_chart(),
 				this.load_leave_planning_summary(),
@@ -93,6 +95,40 @@ class FlexitimeDashboard {
 			console.error('Dashboard error:', error);
 			frappe.msgprint(__('Error loading dashboard: ') + error.message);
 		}
+	}
+
+	async load_pending_review() {
+		const result = await frappe.call({
+			method: 'flexitime.api.roll_call.get_pending_review_count'
+		});
+
+		const data = result.message || {};
+		const container = this.wrapper.find('.pending-review-container');
+
+		// Only show if user can approve and there are pending items
+		if (!data.can_approve || data.count === 0) {
+			container.empty();
+			return;
+		}
+
+		container.html(`
+			<div class="frappe-card pending-review-card" style="border-left: 4px solid var(--orange-500);">
+				<div class="card-body d-flex justify-content-between align-items-center">
+					<div>
+						<h5 class="mb-1" style="color: var(--orange-600);">
+							${frappe.utils.icon('clipboard-check', 'sm')}
+							${__('For Review')}
+						</h5>
+						<p class="mb-0 text-muted">
+							${data.count} ${data.count === 1 ? __('leave application') : __('leave applications')} ${__('awaiting your approval')}
+						</p>
+					</div>
+					<a href="/app/leave-application?status=Open" class="btn btn-sm btn-primary">
+						${__('Review Applications')}
+					</a>
+				</div>
+			</div>
+		`);
 	}
 
 	async load_number_cards() {

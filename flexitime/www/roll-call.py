@@ -46,7 +46,12 @@ def get_context(context):
             frappe.PermissionError
         )
 
+    # Get user roles for JavaScript
+    user_doc = frappe.get_doc("User", frappe.session.user)
+    user_roles = [r.role for r in user_doc.roles]
+
     context.current_employee = current_employee
+    context.user_roles = user_roles
     context.no_cache = 1
     context.show_sidebar = False
 

@@ -7,6 +7,12 @@
  "field_order": [
   "employee",
   "employee_name",
+  "section_break_flexitime",
+  "flexitime_balance",
+  "column_break_flexitime",
+  "uses_timesheet",
+  "show_in_roll_call",
+  "requires_weekly_entry",
   "section_break_permissions",
   "presence_permissions"
  ],
@@ -14,6 +20,7 @@
   {
    "fieldname": "employee",
    "fieldtype": "Link",
+   "get_query": "flexitime.flexitime.doctype.employee_presence_settings.employee_presence_settings.get_employee_query",
    "in_list_view": 1,
    "label": "Employee",
    "options": "Employee",
@@ -27,6 +34,46 @@
    "in_list_view": 1,
    "label": "Employee Name",
    "read_only": 1
+  },
+  {
+   "fieldname": "section_break_flexitime",
+   "fieldtype": "Section Break",
+   "label": "Flexitime Settings"
+  },
+  {
+   "description": "Current running flexitime balance (hours)",
+   "fieldname": "flexitime_balance",
+   "fieldtype": "Float",
+   "label": "Flexitime Balance",
+   "precision": "1",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_flexitime",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "Employee uses ERPNext Timesheets for time tracking",
+   "fieldname": "uses_timesheet",
+   "fieldtype": "Check",
+   "label": "Uses Timesheet"
+  },
+  {
+   "default": "0",
+   "description": "If checked, this employee will appear in the Roll Call view",
+   "fieldname": "show_in_roll_call",
+   "fieldtype": "Check",
+   "label": "Show in Roll Call",
+   "read_only_depends_on": "eval:!frappe.user.has_role('HR Manager') && !frappe.user.has_role('HR User')"
+  },
+  {
+   "default": "0",
+   "description": "If checked, this employee must submit weekly entries",
+   "fieldname": "requires_weekly_entry",
+   "fieldtype": "Check",
+   "label": "Requires Weekly Entry",
+   "read_only_depends_on": "eval:!frappe.user.has_role('HR Manager') && !frappe.user.has_role('HR User')"
   },
   {
    "fieldname": "section_break_permissions",
@@ -60,6 +107,16 @@
    "report": 1,
    "role": "HR Manager",
    "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR User",
    "write": 1
   },
   {

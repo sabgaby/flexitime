@@ -98,7 +98,7 @@ class TestLeaveApplicationIntegration(IntegrationTestCase):
 		# Link presence type to leave type
 		if frappe.db.exists("Presence Type", "vacation"):
 			frappe.db.set_value("Presence Type", "vacation", {
-				"is_leave": 1,
+				"requires_leave_application": 1,
 				"leave_type": cls.leave_type.name
 			})
 
@@ -400,7 +400,7 @@ class TestLeaveStatusInRollCall(IntegrationTestCase):
 		# Link presence type to leave type
 		if frappe.db.exists("Presence Type", "vacation"):
 			frappe.db.set_value("Presence Type", "vacation", {
-				"is_leave": 1,
+				"requires_leave_application": 1,
 				"leave_type": cls.leave_type.name,
 				"requires_leave_application": 1
 			})

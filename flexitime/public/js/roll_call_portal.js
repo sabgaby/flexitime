@@ -21,7 +21,9 @@
 	class RollCallPortal {
 		constructor() {
 			this.currentEmployee = window.rollCallPortalData?.currentEmployee;
-			this.startDate = this.getMonday(new Date());
+			// Use shared date utilities (portal version uses native Date, so useFrappe=false)
+			const DateUtils = window.FlexitimeDateUtils || {};
+			this.startDate = DateUtils.getMondayOfWeek ? DateUtils.getMondayOfWeek(new Date(), false) : this.getMonday(new Date());
 			this.showWeekends = false;
 			this.entries = {};
 			this.employees = [];
@@ -80,7 +82,7 @@
 			try {
 				const response = await this.callAPI('frappe.client.get_list', {
 					doctype: 'Presence Type',
-					fields: ['name', 'label', 'icon', 'category', 'color', 'is_system', 'is_leave', 'available_to_all'],
+					fields: ['name', 'label', 'icon', 'expect_work_hours', 'color', 'requires_leave_application', 'available_to_all'],
 					order_by: 'sort_order asc',
 					limit_page_length: 0
 				});
@@ -100,12 +102,15 @@
 			this.showLoading(true);
 
 			try {
-				const endDate = this.addDays(this.startDate, DAYS_TO_SHOW - 1);
+				const DateUtils = window.FlexitimeDateUtils || {};
+				const addDays = DateUtils.addDays || this.addDays.bind(this);
+				const formatDate = DateUtils.formatDate || this.formatDate.bind(this);
+				const endDate = addDays(this.startDate, DAYS_TO_SHOW - 1, false);
 
-				// Get events using the existing API
+				// Single API call - get_events now includes employee data
 				const response = await this.callAPI('flexitime.api.roll_call.get_events', {
-					month_start: this.formatDate(this.startDate),
-					month_end: this.formatDate(endDate)
+					month_start: formatDate(this.startDate, false),
+					month_end: formatDate(endDate, false)
 				});
 
 				// Process entries
@@ -119,17 +124,8 @@
 					}
 				}
 
-				// Load employees
-				const empResponse = await this.callAPI('frappe.client.get_list', {
-					doctype: 'Employee',
-					filters: { status: 'Active' },
-					fields: ['name', 'employee_name', 'image', 'nickname'],
-					order_by: 'employee_name asc',
-					limit_page_length: 0
-				});
-
-				this.employees = empResponse || [];
-
+				// Get employees from the same response (avoids duplicate API call)
+				this.employees = response.employees || [];
 				this.render();
 			} catch (error) {
 				console.error('Failed to load data:', error);
@@ -236,7 +232,10 @@
 					if (entry && !d.isWeekend) {
 						const pt = this.presenceTypesMap.get(entry.presence_type);
 						if (pt) {
-							cellStyle = `--presence-color: ${this.getColorVar(pt.color)}`;
+							const ColorUtils = window.FlexitimeColorUtils || {};
+							const getColor = ColorUtils.getPresenceColor || this.getColorVar.bind(this);
+							// Portal may not have Frappe CSS vars, so allow hex fallback
+							cellStyle = `--presence-color: ${getColor(pt.color, false)}`;
 							content = `<span class="presence-icon">${pt.icon || ''}</span>`;
 						}
 					}
@@ -275,13 +274,14 @@
 			const container = document.querySelector('.legend-items');
 			if (!container) return;
 
+			const ColorUtils = window.FlexitimeColorUtils || {};
+			const getColor = ColorUtils.getPresenceColor || this.getColorVar.bind(this);
+
 			let html = '';
 			for (const pt of this.presenceTypes) {
-				if (pt.is_system) continue; // Skip system types like weekend
-
 				html += `
 					<div class="legend-item">
-						<span class="legend-icon" style="--presence-color: ${this.getColorVar(pt.color)}">${pt.icon || ''}</span>
+						<span class="legend-icon" style="--presence-color: ${getColor(pt.color, false)}">${pt.icon || ''}</span>
 						<span class="legend-label">${pt.label || pt.name}</span>
 					</div>
 				`;
@@ -302,15 +302,17 @@
 			const modal = document.querySelector('.presence-modal');
 			const list = modal.querySelector('.presence-types-list');
 
+			const ColorUtils = window.FlexitimeColorUtils || {};
+			const getColor = ColorUtils.getPresenceColor || this.getColorVar.bind(this);
+
 			// Build presence type options
 			let html = '';
 			for (const pt of this.presenceTypes) {
-				// Skip system types and leave types (require leave application)
-				if (pt.is_system) continue;
-				if (pt.is_leave) continue;
+				// Skip leave types (require leave application)
+				if (pt.requires_leave_application) continue;
 
 				html += `
-					<button class="presence-type-option" data-type="${pt.name}" style="--presence-color: ${this.getColorVar(pt.color)}">
+					<button class="presence-type-option" data-type="${pt.name}" style="--presence-color: ${getColor(pt.color, false)}">
 						<span class="option-icon">${pt.icon || ''}</span>
 						<span class="option-label">${pt.label || pt.name}</span>
 					</button>
@@ -382,7 +384,9 @@
 		 * Navigate to today
 		 */
 		goToToday() {
-			this.startDate = this.getMonday(new Date());
+			const DateUtils = window.FlexitimeDateUtils || {};
+			const getMonday = DateUtils.getMondayOfWeek || this.getMonday.bind(this);
+			this.startDate = getMonday(new Date(), false);
 			this.loadData();
 		}
 
@@ -390,7 +394,9 @@
 		 * Navigate weeks forward or backward
 		 */
 		navigateWeek(direction) {
-			this.startDate = this.addDays(this.startDate, direction * 7);
+			const DateUtils = window.FlexitimeDateUtils || {};
+			const addDays = DateUtils.addDays || this.addDays.bind(this);
+			this.startDate = addDays(this.startDate, direction * 7, false);
 			this.loadData();
 		}
 
@@ -403,14 +409,18 @@
 		 */
 		getDaysInRange() {
 			const days = [];
+			const DateUtils = window.FlexitimeDateUtils || {};
+			const addDays = DateUtils.addDays || this.addDays.bind(this);
+			const formatDate = DateUtils.formatDate || this.formatDate.bind(this);
+			
 			for (let i = 0; i < DAYS_TO_SHOW; i++) {
-				const date = this.addDays(this.startDate, i);
+				const date = addDays(this.startDate, i, false);
 				const dayOfWeek = date.getDay();
 				const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
 				days.push({
 					date: date,
-					dateStr: this.formatDate(date),
+					dateStr: formatDate(date, false),
 					day: date.getDate(),
 					month: date.getMonth(),
 					year: date.getFullYear(),
@@ -452,8 +462,14 @@
 
 		/**
 		 * Get Monday of the week containing the given date
+		 * @deprecated Use window.FlexitimeDateUtils.getMondayOfWeek() instead
 		 */
 		getMonday(date) {
+			const DateUtils = window.FlexitimeDateUtils;
+			if (DateUtils && DateUtils.getMondayOfWeek) {
+				return DateUtils.getMondayOfWeek(date, false);
+			}
+			// Fallback implementation
 			const d = new Date(date);
 			const day = d.getDay();
 			const diff = d.getDate() - day + (day === 0 ? -6 : 1);
@@ -462,8 +478,14 @@
 
 		/**
 		 * Add days to a date
+		 * @deprecated Use window.FlexitimeDateUtils.addDays() instead
 		 */
 		addDays(date, days) {
+			const DateUtils = window.FlexitimeDateUtils;
+			if (DateUtils && DateUtils.addDays) {
+				return DateUtils.addDays(date, days, false);
+			}
+			// Fallback implementation
 			const result = new Date(date);
 			result.setDate(result.getDate() + days);
 			return result;
@@ -471,8 +493,14 @@
 
 		/**
 		 * Format date as YYYY-MM-DD
+		 * @deprecated Use window.FlexitimeDateUtils.formatDate() instead
 		 */
 		formatDate(date) {
+			const DateUtils = window.FlexitimeDateUtils;
+			if (DateUtils && DateUtils.formatDate) {
+				return DateUtils.formatDate(date, false);
+			}
+			// Fallback implementation
 			const year = date.getFullYear();
 			const month = String(date.getMonth() + 1).padStart(2, '0');
 			const day = String(date.getDate()).padStart(2, '0');
@@ -481,12 +509,17 @@
 
 		/**
 		 * Convert color name to CSS variable or hex
+		 * @deprecated Use window.FlexitimeColorUtils.getPresenceColor() instead
 		 */
 		getColorVar(color) {
+			const ColorUtils = window.FlexitimeColorUtils;
+			if (ColorUtils && ColorUtils.getPresenceColor) {
+				return ColorUtils.getPresenceColor(color, false);
+			}
+			// Fallback implementation (legacy hex mapping for portal)
 			if (!color) return '#e5e7eb';
 			if (color.startsWith('#') || color.startsWith('rgb')) return color;
 
-			// Map common color names to CSS variables or hex
 			const colorMap = {
 				'blue': '#3b82f6',
 				'green': '#22c55e',

@@ -9,10 +9,63 @@ class FlexitimeSettings(Document):
 	pass
 
 
-def get_settings():
-	"""Get Flexitime Settings (cached)
+@frappe.whitelist()
+def get_palette_groups():
+	"""Get palette groups with their presence types for Roll Call palette
 
 	Returns:
-		FlexitimeSettings document
+		list: List of palette groups with their presence types
 	"""
-	return frappe.get_cached_doc("Flexitime Settings")
+	# Get all palette groups ordered by sort_order
+	groups = frappe.get_all(
+		"Palette Group",
+		fields=["name", "group_name", "label", "sort_order"],
+		order_by="sort_order asc"
+	)
+
+	# Get all presence types with their palette_group
+	presence_types = frappe.get_all(
+		"Presence Type",
+		fields=["name", "palette_group"],
+		order_by="sort_order asc"
+	)
+
+	# Build groups with their presence types
+	result = []
+	for group in groups:
+		pt_names = [
+			pt["name"] for pt in presence_types
+			if pt.get("palette_group") == group["name"]
+		]
+		result.append({
+			"group_name": group["group_name"],
+			"label": group["label"],
+			"sort_order": group["sort_order"],
+			"presence_types": pt_names
+		})
+
+	# Add unassigned presence types to a default "Other" group
+	assigned = set()
+	for group in result:
+		assigned.update(group["presence_types"])
+
+	unassigned = [pt["name"] for pt in presence_types if pt["name"] not in assigned]
+	if unassigned:
+		# If no groups exist, create a default one
+		if not result:
+			result.append({
+				"group_name": "default",
+				"label": "All",
+				"sort_order": 0,
+				"presence_types": unassigned
+			})
+		else:
+			# Add unassigned to an "Other" group at the end
+			result.append({
+				"group_name": "other",
+				"label": "Other",
+				"sort_order": 999,
+				"presence_types": unassigned
+			})
+
+	return result

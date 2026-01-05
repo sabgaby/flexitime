@@ -43,28 +43,31 @@ class RollCallEntry(Document):
 
 		presence_type = frappe.get_doc("Presence Type", self.presence_type)
 
-		# System types cannot be manually selected
-		if presence_type.is_system:
-			frappe.throw(_("'{0}' is a system type and cannot be manually selected").format(
-				presence_type.label))
-
 		# Check if available to all
 		if presence_type.available_to_all:
-			return
+			# Still need to check day off pattern match
+			pass
+		else:
+			# Check employee-specific permissions
+			employee_permissions = frappe.get_all("Employee Presence Permission",
+				filters={"parent": self.employee},
+				pluck="presence_type"
+			)
 
-		# Check employee-specific permissions
-		employee_permissions = frappe.get_all("Employee Presence Permission",
-			filters={"parent": self.employee},
-			pluck="presence_type"
-		)
+			if self.presence_type not in employee_permissions:
+				frappe.throw(_("You don't have permission to select '{0}'. "
+					"Contact HR to add this presence type to your profile.").format(
+					presence_type.label))
 
-		if self.presence_type not in employee_permissions:
-			frappe.throw(_("You don't have permission to select '{0}'. "
-				"Contact HR to add this presence type to your profile.").format(
-				presence_type.label))
+		# Check if this is the day off presence type and validate pattern match
+		try:
+			settings = frappe.get_cached_doc("Flexitime Settings")
+			day_off_presence_type = settings.day_off_presence_type
+		except Exception:
+			# Fallback to default if settings not available
+			day_off_presence_type = "day_off" if frappe.db.exists("Presence Type", "day_off") else None
 
-		# Check requires_pattern_match
-		if presence_type.requires_pattern_match:
+		if day_off_presence_type and self.presence_type == day_off_presence_type:
 			from flexitime.flexitime.doctype.employee_work_pattern.employee_work_pattern import get_work_pattern
 			pattern = get_work_pattern(self.employee, self.date)
 			if pattern:

@@ -9,23 +9,16 @@
   "presence_name",
   "label",
   "icon",
+  "color",
   "column_break_basic",
-  "category",
-  "parent_presence_type",
+  "expect_work_hours",
   "sort_order",
+  "palette_group",
   "section_break_settings",
   "available_to_all",
-  "requires_pattern_match",
-  "show_in_quick_dialog",
   "column_break_settings",
-  "is_system",
-  "is_leave",
   "requires_leave_application",
-  "leave_type",
-  "deducts_from_flextime_balance",
-  "section_break_display",
-  "color",
-  "description"
+  "leave_type"
  ],
  "fields": [
   {
@@ -55,24 +48,27 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "category",
-   "fieldtype": "Select",
+   "default": 0,
+   "fieldname": "expect_work_hours",
+   "fieldtype": "Check",
    "in_list_view": 1,
-   "label": "Category",
-   "options": "Working\nScheduled\nLeave",
-   "reqd": 1
-  },
-  {
-   "fieldname": "parent_presence_type",
-   "fieldtype": "Link",
-   "label": "Parent Presence Type",
-   "options": "Presence Type"
+   "label": "Expect Work Hours",
+   "description": "If checked, this presence type expects work hours from the Employee Work Pattern. If unchecked, expected hours are 0."
   },
   {
    "default": "0",
+   "description": "Controls display order in the palette (lower numbers appear first)",
    "fieldname": "sort_order",
    "fieldtype": "Int",
    "label": "Sort Order"
+  },
+  {
+   "description": "Group this presence type belongs to in the Roll Call palette",
+   "fieldname": "palette_group",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Palette Group",
+   "options": "Palette Group"
   },
   {
    "fieldname": "section_break_settings",
@@ -87,36 +83,8 @@
    "label": "Available to All"
   },
   {
-   "default": "0",
-   "description": "Only available if Work Pattern shows 0 expected hours for that day",
-   "fieldname": "requires_pattern_match",
-   "fieldtype": "Check",
-   "label": "Requires Pattern Match"
-  },
-  {
-   "default": "1",
-   "description": "Show in main dialog. If unchecked, appears under 'Show more'",
-   "fieldname": "show_in_quick_dialog",
-   "fieldtype": "Check",
-   "label": "Show in Quick Dialog"
-  },
-  {
    "fieldname": "column_break_settings",
    "fieldtype": "Column Break"
-  },
-  {
-   "default": "0",
-   "description": "System-managed, not user-selectable (weekend, holiday)",
-   "fieldname": "is_system",
-   "fieldtype": "Check",
-   "label": "Is System Type"
-  },
-  {
-   "default": "0",
-   "description": "Maps to ERPNext Leave Application",
-   "fieldname": "is_leave",
-   "fieldtype": "Check",
-   "label": "Is Leave Type"
   },
   {
    "default": "0",
@@ -127,6 +95,7 @@
   },
   {
    "depends_on": "eval:doc.requires_leave_application",
+   "description": "The Leave Type to link when this presence requires approval",
    "fieldname": "leave_type",
    "fieldtype": "Link",
    "label": "Leave Type",
@@ -134,30 +103,11 @@
    "options": "Leave Type"
   },
   {
-   "default": "0",
-   "depends_on": "eval:doc.requires_leave_application",
-   "description": "Expected hours stay at Work Pattern value instead of 0. Use for Flex Off to deduct from balance.",
-   "fieldname": "deducts_from_flextime_balance",
-   "fieldtype": "Check",
-   "label": "Deducts from Flextime Balance"
-  },
-  {
-   "fieldname": "section_break_display",
-   "fieldtype": "Section Break",
-   "label": "Display"
-  },
-  {
    "description": "Background color for grid display. Uses Frappe UI colors for light/dark mode support.",
    "fieldname": "color",
    "fieldtype": "Select",
    "label": "Color",
    "options": "\nblue\ngreen\norange\nyellow\nred\npurple\npink\ncyan\ngray"
-  },
-  {
-   "description": "Help text for employees",
-   "fieldname": "description",
-   "fieldtype": "Small Text",
-   "label": "Description"
   }
  ],
  "links": [],
@@ -186,6 +136,10 @@
    "print": 1,
    "read": 1,
    "report": 1,
+   "role": "HR User"
+  },
+  {
+   "read": 1,
    "role": "Employee"
   }
  ],

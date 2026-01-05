@@ -16,7 +16,13 @@ Installation Steps:
 Custom Fields Created:
     Employee:
         - custom_flexitime_balance: Running flexitime balance
-        - calendar_feed_token: Token for iCal subscription
+        - nickname: Short name for display in Roll Call
+    
+    Employee Presence Settings:
+        - flexitime_balance: Read-only display of employee's flexitime balance (fetched from Employee)
+        - uses_timesheet: Whether employee uses ERPNext Timesheets for time tracking
+        - show_in_roll_call: Controls which employees appear in Roll Call view
+        - requires_weekly_entry: Controls which employees must submit weekly entries
 
     Leave Application:
         - google_calendar_event_id: For calendar sync
@@ -56,6 +62,8 @@ def after_install():
 	create_leave_types()
 	create_presence_types()
 	create_email_templates()
+	configure_default_settings()
+	create_default_palette_groups()
 	frappe.db.commit()
 
 
@@ -150,59 +158,48 @@ def create_leave_types():
 def create_presence_types():
 	"""Create default Presence Types.
 
-	IMPORTANT: The system types (holiday, weekend, day_off) are REQUIRED for
-	the auto_create_roll_call_entries task to function. These are created first
-	with hardcoded values to ensure they always exist, independent of fixtures.
+	System types:
+	- holiday: Auto-created by scheduled task, locked (employees can't edit)
+
+	Non-system types:
+	- day_off: Selectable by employees, created by Employee Work Pattern
+
+	Note: Weekend is NOT a presence type - weekend cells are just empty.
 	"""
-	# REQUIRED system types - these MUST exist for scheduled tasks to work
-	# The get_auto_presence_type() function returns these hardcoded names
-	required_system_types = [
+	# REQUIRED presence types - these MUST exist for scheduled tasks to work
+	required_presence_types = [
 		{
 			"doctype": "Presence Type",
 			"presence_name": "holiday",
 			"label": "Holiday",
-			"icon": "🥳",
-			"category": "Scheduled",
-			"is_system": 1,
+			"icon": "🎊",
+			"expect_work_hours": 0,
 			"available_to_all": 0,
-			"show_in_quick_dialog": 0,
 			"sort_order": 42
 		},
 		{
-			"doctype": "Presence Type",
-			"presence_name": "weekend",
-			"label": "Weekend",
-			"icon": "⬜",
-			"category": "Scheduled",
-			"is_system": 1,
-			"available_to_all": 0,
-			"show_in_quick_dialog": 0,
-			"sort_order": 41
-		},
-		{
+			# day_off is selectable by employees
+			# and created by Employee Work Pattern with source="Pattern"
 			"doctype": "Presence Type",
 			"presence_name": "day_off",
 			"label": "Day off",
-			"icon": "😶‍🌫️",
-			"category": "Scheduled",
-			"is_system": 1,
-			"available_to_all": 0,
-			"show_in_quick_dialog": 0,
-			"requires_pattern_match": 1,
+			"icon": "🪁",
+			"expect_work_hours": 0,
+			"available_to_all": 1,  # Any employee can choose day_off
 			"sort_order": 40
 		}
 	]
 
-	# Create required system types first (these MUST exist)
-	for pt in required_system_types:
+	# Create required presence types first (these MUST exist)
+	for pt in required_presence_types:
 		if frappe.db.exists("Presence Type", pt.get("presence_name")):
-			frappe.logger().info(f"Required system type already exists: {pt.get('presence_name')}")
+			frappe.logger().info(f"Required presence type already exists: {pt.get('presence_name')}")
 			continue
 
 		try:
 			doc = frappe.get_doc(pt)
 			doc.insert(ignore_permissions=True)
-			frappe.logger().info(f"Created required system type: {pt.get('presence_name')}")
+			frappe.logger().info(f"Created required presence type: {pt.get('presence_name')}")
 		except Exception as e:
 			# This is a critical error - log it prominently
 			frappe.log_error(
@@ -223,53 +220,21 @@ def create_presence_types():
 	with open(fixture_path) as f:
 		presence_types = json.load(f)
 
-	# First pass: create non-leave types and types without parents
+	# Create all presence types from fixture (single pass)
 	for pt in presence_types:
-		if pt.get("is_leave") or pt.get("parent_presence_type"):
-			continue
-
 		if frappe.db.exists("Presence Type", pt.get("presence_name")):
 			continue
 
-		try:
-			doc = frappe.get_doc(pt)
-			doc.insert(ignore_permissions=True)
-			frappe.logger().info(f"Created presence type: {pt.get('presence_name')}")
-		except Exception as e:
-			frappe.logger().warning(f"Could not create presence type {pt.get('presence_name')}: {e}")
-
-	# Second pass: create types with parents (but not leave types)
-	for pt in presence_types:
-		if pt.get("is_leave") or not pt.get("parent_presence_type"):
-			continue
-
-		if frappe.db.exists("Presence Type", pt.get("presence_name")):
-			continue
-
-		try:
-			doc = frappe.get_doc(pt)
-			doc.insert(ignore_permissions=True)
-			frappe.logger().info(f"Created presence type: {pt.get('presence_name')}")
-		except Exception as e:
-			frappe.logger().warning(f"Could not create presence type {pt.get('presence_name')}: {e}")
-
-	# Third pass: create leave types (only if corresponding Leave Type exists)
-	for pt in presence_types:
-		if not pt.get("is_leave"):
-			continue
-
-		if frappe.db.exists("Presence Type", pt.get("presence_name")):
-			continue
-
-		# Skip leave_type validation for now - create without it
+		# Skip leave_type validation if requires_leave_application but leave_type not set
 		pt_copy = pt.copy()
-		pt_copy.pop("leave_type", None)  # Remove leave_type reference
-		pt_copy["is_leave"] = 0  # Temporarily set to 0 to bypass validation
+		if pt_copy.get("requires_leave_application") and not pt_copy.get("leave_type"):
+			pt_copy.pop("leave_type", None)  # Remove leave_type reference
+			pt_copy["requires_leave_application"] = 0  # Temporarily set to 0 to bypass validation
 
 		try:
 			doc = frappe.get_doc(pt_copy)
 			doc.insert(ignore_permissions=True)
-			frappe.logger().info(f"Created presence type: {pt.get('presence_name')} (leave type can be linked later)")
+			frappe.logger().info(f"Created presence type: {pt.get('presence_name')}")
 		except Exception as e:
 			frappe.logger().warning(f"Could not create presence type {pt.get('presence_name')}: {e}")
 
@@ -295,3 +260,66 @@ def create_email_templates():
 		doc = frappe.get_doc(template)
 		doc.insert(ignore_permissions=True)
 		frappe.logger().info(f"Created email template: {template.get('name')}")
+
+
+def configure_default_settings():
+	"""Set default values in Flexitime Settings if not already set"""
+	try:
+		settings = frappe.get_single("Flexitime Settings")
+		changed = False
+
+		# Set default sick leave type if not set
+		if not settings.sick_leave_type:
+			# Try to find a leave type named "Sick Leave" or similar
+			sick_leave = frappe.db.get_value("Leave Type", {"leave_type_name": ["like", "%Sick%"]}, "name")
+			if sick_leave:
+				settings.sick_leave_type = sick_leave
+				changed = True
+				frappe.logger().info(f"Set default sick leave type: {sick_leave}")
+
+		# Set default holiday presence type if not set
+		if not settings.holiday_presence_type:
+			if frappe.db.exists("Presence Type", "holiday"):
+				settings.holiday_presence_type = "holiday"
+				changed = True
+				frappe.logger().info("Set default holiday presence type: holiday")
+
+		# Set default day off presence type if not set
+		if not settings.day_off_presence_type:
+			if frappe.db.exists("Presence Type", "day_off"):
+				settings.day_off_presence_type = "day_off"
+				changed = True
+				frappe.logger().info("Set default day off presence type: day_off")
+
+		if changed:
+			settings.save(ignore_permissions=True)
+			frappe.logger().info("Configured default Flexitime Settings")
+	except Exception as e:
+		frappe.logger().warning(f"Could not configure default settings: {e}")
+
+
+def create_default_palette_groups():
+	"""Create default Palette Group and assign all presence types to it"""
+	try:
+		# Check if Default palette group exists
+		if not frappe.db.exists("Palette Group", "Default"):
+			doc = frappe.get_doc({
+				"doctype": "Palette Group",
+				"group_name": "Default",
+				"label": "Default",
+				"sort_order": 0
+			})
+			doc.insert(ignore_permissions=True)
+			frappe.logger().info("Created default Palette Group: Default")
+
+		# Assign all presence types without a palette_group to Default
+		frappe.db.sql("""
+			UPDATE `tabPresence Type`
+			SET palette_group = 'Default'
+			WHERE palette_group IS NULL OR palette_group = ''
+		""")
+		frappe.db.commit()
+		frappe.logger().info("Assigned unassigned presence types to Default palette group")
+
+	except Exception as e:
+		frappe.logger().warning(f"Could not create default palette group: {e}")

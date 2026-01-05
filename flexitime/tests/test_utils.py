@@ -107,27 +107,26 @@ def create_test_presence_types():
 	"""
 	presence_types = {}
 
-	# System types
-	system_types = [
-		{"presence_name": "weekend", "label": "Weekend", "icon": "W", "category": "Scheduled", "is_system": 1},
-		{"presence_name": "holiday", "label": "Holiday", "icon": "H", "category": "Scheduled", "is_system": 1},
-		{"presence_name": "day_off", "label": "Day off", "icon": "D", "category": "Scheduled", "is_system": 1, "requires_pattern_match": 1},
+	# Not working types (holiday, day_off)
+	scheduled_types = [
+		{"presence_name": "holiday", "label": "Holiday", "icon": "H", "expect_work_hours": 0},
+		{"presence_name": "day_off", "label": "Day off", "icon": "D", "expect_work_hours": 0, "available_to_all": 1},
 	]
 
 	# Working types
 	working_types = [
-		{"presence_name": "office", "label": "Office", "icon": "O", "category": "Working", "available_to_all": 1},
-		{"presence_name": "home", "label": "Home", "icon": "H", "category": "Working", "available_to_all": 1},
+		{"presence_name": "office", "label": "Office", "icon": "O", "expect_work_hours": 1, "available_to_all": 1},
+		{"presence_name": "home", "label": "Home", "icon": "H", "expect_work_hours": 1, "available_to_all": 1},
 	]
 
 	# Leave types
 	leave_types = [
-		{"presence_name": "vacation", "label": "Vacation", "icon": "V", "category": "Leave", "is_leave": 1, "available_to_all": 1, "requires_leave_application": 1},
-		{"presence_name": "sick", "label": "Sick", "icon": "S", "category": "Leave", "is_leave": 1, "available_to_all": 1, "requires_leave_application": 1},
-		{"presence_name": "flex_off", "label": "Flex Off", "icon": "F", "category": "Leave", "is_leave": 1, "available_to_all": 1, "requires_leave_application": 1, "deducts_from_flextime_balance": 1},
+		{"presence_name": "vacation", "label": "Vacation", "icon": "V", "expect_work_hours": 0, "available_to_all": 1, "requires_leave_application": 1},
+		{"presence_name": "sick", "label": "Sick", "icon": "S", "expect_work_hours": 0, "available_to_all": 1, "requires_leave_application": 1},
+		{"presence_name": "flex_off", "label": "Flex Off", "icon": "F", "expect_work_hours": 1, "available_to_all": 1, "requires_leave_application": 1},
 	]
 
-	all_types = system_types + working_types + leave_types
+	all_types = scheduled_types + working_types + leave_types
 
 	for pt_data in all_types:
 		pt_data["doctype"] = "Presence Type"

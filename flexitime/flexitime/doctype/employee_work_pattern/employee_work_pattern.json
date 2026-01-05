@@ -7,6 +7,7 @@
  "field_order": [
   "employee",
   "employee_name",
+  "status",
   "column_break_emp",
   "fte_percentage",
   "flexitime_limit_hours",
@@ -24,6 +25,8 @@
   "valid_from",
   "column_break_validity",
   "valid_to",
+  "section_break_balance",
+  "initial_balance",
   "section_break_notes",
   "notes"
  ],
@@ -43,6 +46,17 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Employee Name",
+   "read_only": 1
+  },
+  {
+   "default": "Active",
+   "description": "Auto-computed based on validity dates",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Active\nInactive",
    "read_only": 1
   },
   {
@@ -163,6 +177,19 @@
    "label": "Valid To"
   },
   {
+   "fieldname": "section_break_balance",
+   "fieldtype": "Section Break",
+   "label": "Initial Balance"
+  },
+  {
+   "default": "0",
+   "description": "Starting flexitime balance when this pattern begins. Use this to carry over balance from a previous system or to set an initial balance for existing employees.",
+   "fieldname": "initial_balance",
+   "fieldtype": "Float",
+   "label": "Initial Balance (Hours)",
+   "precision": "2"
+  },
+  {
    "fieldname": "section_break_notes",
    "fieldtype": "Section Break"
   },
@@ -193,6 +220,17 @@
    "share": 1,
    "submit": 1,
    "cancel": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR User",
+   "submit": 1,
    "write": 1
   },
   {

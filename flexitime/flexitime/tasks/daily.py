@@ -11,7 +11,7 @@ Scheduled Tasks:
         Locks Roll Call entries from past weeks to prevent modification
 
     auto_create_roll_call_entries (00:10):
-        Pre-creates system entries for weekends, holidays, and days off
+        Pre-creates system entries for holidays only
 
     auto_lock_submitted_entries:
         Locks submitted Weekly Entries after configured number of days
@@ -61,7 +61,10 @@ def auto_create_roll_call_entries():
 	"""Create system Roll Call Entries for next 2 weeks
 
 	Runs daily at 00:10
-	Creates entries for weekends, holidays, and scheduled days off
+	Creates entries for holidays only.
+	Note:
+	- day_off entries are created by Employee Work Pattern on submit
+	- weekend cells are left empty - employees can record work if they work weekends
 	"""
 	today_date = getdate(today())
 	end_date = add_days(today_date, 14)
@@ -85,7 +88,10 @@ def auto_create_roll_call_entries():
 					employee.name, current_date
 				)
 
-				if presence_type and source == "System":
+				# Only auto-create holidays (not weekend or day_off)
+				# - day_off is handled by Employee Work Pattern with source="Pattern"
+				# - weekends are left empty so employees can record work if needed
+				if presence_type and source == "System" and presence_type == "holiday":
 					try:
 						doc = frappe.get_doc({
 							"doctype": "Roll Call Entry",

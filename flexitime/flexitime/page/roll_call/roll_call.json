@@ -17,6 +17,12 @@
   },
   {
    "role": "HR Manager"
+  },
+  {
+   "role": "HR User"
+  },
+  {
+   "role": "Leave Approver"
   }
  ],
  "script": null,

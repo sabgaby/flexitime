@@ -7,39 +7,17 @@ from frappe.model.document import Document
 
 class PresenceType(Document):
 	def validate(self):
-		self.validate_parent()
 		self.validate_leave_type()
-		self.validate_system_type()
-
-	def validate_parent(self):
-		"""Ensure parent is not self. Parent can be any presence type for organizational grouping."""
-		if self.parent_presence_type:
-			if self.parent_presence_type == self.name:
-				frappe.throw("Parent Presence Type cannot be itself")
 
 	def validate_leave_type(self):
-		"""Ensure leave_type is set if is_leave is checked"""
-		if self.is_leave and not self.leave_type:
-			frappe.throw("Leave Type is required when 'Is Leave Type' is checked")
-
-	def validate_system_type(self):
-		"""System types should not be available_to_all or have parent"""
-		if self.is_system:
-			# System types are auto-assigned, not manually selectable
-			if self.available_to_all:
-				frappe.msgprint(
-					"System types are automatically assigned, 'Available to All' has no effect",
-					indicator="blue"
-				)
+		"""Ensure leave_type is set if requires_leave_application is checked"""
+		if self.requires_leave_application and not self.leave_type:
+			frappe.throw("Leave Type is required when 'Requires Leave Application' is checked")
 
 
 @frappe.whitelist()
 def get_available_presence_types(employee, date):
-	"""Return list of Presence Types employee can select for a date
-
-	Includes `show_in_quick_dialog` flag for each type to support
-	quick vs extended dialog display.
-	"""
+	"""Return list of Presence Types employee can select for a date"""
 	from frappe.utils import getdate, today
 	from flexitime.flexitime.utils import get_work_pattern
 
@@ -47,11 +25,19 @@ def get_available_presence_types(employee, date):
 	pattern = get_work_pattern(employee, date)
 	expected_hours = pattern.get_hours_for_weekday(date) if pattern else 0
 
-	# Get all presence types that are not system types
+	# Get day off presence type from Flexitime Settings
+	day_off_presence_type = None
+	try:
+		settings = frappe.get_cached_doc("Flexitime Settings")
+		day_off_presence_type = settings.day_off_presence_type
+	except Exception:
+		# Fallback to default if settings not available
+		day_off_presence_type = "day_off" if frappe.db.exists("Presence Type", "day_off") else None
+
+	# Get all presence types
 	all_types = frappe.get_all("Presence Type",
-		filters={"is_system": 0},
-		fields=["name", "label", "icon", "available_to_all", "requires_pattern_match",
-				"is_leave", "category", "color", "leave_type", "show_in_quick_dialog"]
+		fields=["name", "label", "icon", "available_to_all",
+				"expect_work_hours", "color", "leave_type"]
 	)
 
 	# Get employee-specific permissions from Employee Presence Settings
@@ -63,8 +49,8 @@ def get_available_presence_types(employee, date):
 		if not pt.available_to_all and pt.name not in employee_permissions:
 			continue
 
-		# Skip day_off type if employee has expected hours that day
-		if pt.requires_pattern_match and expected_hours > 0:
+		# Skip day off presence type if employee has expected hours that day
+		if day_off_presence_type and pt.name == day_off_presence_type and expected_hours > 0:
 			continue
 
 		available.append(pt)
@@ -117,12 +103,16 @@ def get_auto_presence_type(employee, date):
 
 	Returns: (presence_type, source, leave_application) tuple
 
-	Note: Returns (None, None, None) if required system types don't exist,
-	to prevent crashes in scheduled tasks. The install.py ensures these
-	types are created, but this provides a safety fallback.
+	Only returns auto-assignable types:
+	- Leave: From approved Leave Applications
+	- Holiday: From Holiday List
+
+	Note: Weekends and day_off are NOT auto-assigned here.
+	- Weekends: Cells are left empty (employees can record work if needed)
+	- Day off: Created by Employee Work Pattern on submit with source="Pattern"
 	"""
 	from frappe.utils import getdate
-	from flexitime.flexitime.utils import get_work_pattern, is_holiday
+	from flexitime.flexitime.utils import is_holiday
 
 	date = getdate(date)
 
@@ -138,47 +128,55 @@ def get_auto_presence_type(employee, date):
 	if leave:
 		# Map Leave Type to Presence Type
 		presence = frappe.db.get_value("Presence Type",
-			{"is_leave": 1, "leave_type": leave.leave_type})
+			{"requires_leave_application": 1, "leave_type": leave.leave_type})
 		if presence:
 			return presence, "Leave", leave.name
 
 	# 2. Check Holiday List
 	if is_holiday(date, employee):
-		# Verify the system type exists before returning it
-		if frappe.db.exists("Presence Type", "holiday"):
-			return "holiday", "System", None
+		# Get holiday presence type from settings
+		try:
+			settings = frappe.get_cached_doc("Flexitime Settings")
+			holiday_presence = settings.holiday_presence_type or "holiday"
+		except Exception:
+			# Fallback to default if settings not available
+			holiday_presence = "holiday"
+		
+		if frappe.db.exists("Presence Type", holiday_presence):
+			return holiday_presence, "System", None
 		else:
 			frappe.log_error(
-				"Required Presence Type 'holiday' not found. Run: bench --site <site> execute flexitime.install.after_install",
+				f"Configured Holiday Presence Type '{holiday_presence}' not found. Please check Flexitime Settings.",
 				"Flexitime Configuration Error"
 			)
 			return None, None, None
 
-	# 3. Check Work Pattern
-	pattern = get_work_pattern(employee, date)
-	weekday = date.weekday()  # 0=Monday, 6=Sunday
-	expected = pattern.get_hours_for_weekday(date) if pattern else 8
-
-	if weekday in [5, 6] and expected == 0:
-		# Verify the system type exists before returning it
-		if frappe.db.exists("Presence Type", "weekend"):
-			return "weekend", "System", None
-		else:
-			frappe.log_error(
-				"Required Presence Type 'weekend' not found. Run: bench --site <site> execute flexitime.install.after_install",
-				"Flexitime Configuration Error"
-			)
-			return None, None, None
-	elif expected == 0:
-		# Verify the system type exists before returning it
-		if frappe.db.exists("Presence Type", "day_off"):
-			return "day_off", "System", None
-		else:
-			frappe.log_error(
-				"Required Presence Type 'day_off' not found. Run: bench --site <site> execute flexitime.install.after_install",
-				"Flexitime Configuration Error"
-			)
-			return None, None, None
-
-	# 4. No auto-assignment - needs manual entry
+	# 3. No auto-assignment - cell will be empty
+	# Weekends: left empty (user can fill in if they work)
+	# Day off: created by Employee Work Pattern, not here
 	return None, None, None
+
+
+@frappe.whitelist()
+def get_requires_incapacity_declaration(leave_type):
+	"""Check if a leave type requires incapacity declaration.
+	
+	Args:
+		leave_type: Leave Type name
+		
+	Returns:
+		bool: True if this Leave Type is configured as sick leave in Flexitime Settings
+	"""
+	if not leave_type:
+		return False
+	
+	# Check Flexitime Settings for sick leave configuration
+	try:
+		settings = frappe.get_cached_doc("Flexitime Settings")
+		if settings.sick_leave_type == leave_type:
+			return True
+	except Exception:
+		# Settings might not exist yet, return False
+		pass
+	
+	return False

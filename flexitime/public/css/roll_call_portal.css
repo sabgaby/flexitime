@@ -315,6 +315,8 @@
 
 .day-cell.has-entry {
 	background: var(--presence-color, #e5e7eb);
+	/* Remove border-radius so color fills entire square cell */
+	border-radius: 0;
 }
 
 .day-cell.has-entry.today {

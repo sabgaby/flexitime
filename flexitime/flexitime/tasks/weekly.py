@@ -52,7 +52,7 @@ import frappe
 from frappe.utils import today, add_days, getdate
 
 from flexitime.flexitime.utils import (
-	get_monday, get_active_employees, format_date,
+	get_monday, get_active_employees, get_employees_requiring_weekly_entry, format_date,
 	get_users_with_role, send_email_template
 )
 
@@ -65,7 +65,7 @@ def create_weekly_entries():
 	from flexitime.flexitime.doctype.weekly_entry.weekly_entry import create_weekly_entry
 
 	week_start = get_monday(today())
-	employees = get_active_employees()
+	employees = get_employees_requiring_weekly_entry()
 	created_count = 0
 
 	for employee in employees:
@@ -160,7 +160,7 @@ def send_timesheet_reminders():
 	"""
 	week_start = get_monday(today())
 
-	employees = get_active_employees()
+	employees = get_employees_requiring_weekly_entry()
 	reminded_count = 0
 
 	for employee in employees:
@@ -375,7 +375,7 @@ def send_submission_reminders():
 	# Get last week's start date
 	last_week_start = add_days(get_monday(today()), -7)
 
-	employees = get_active_employees()
+	employees = get_employees_requiring_weekly_entry()
 	reminded_count = 0
 
 	for employee in employees:

@@ -88,30 +88,6 @@
 	color: var(--heading-color);
 }
 
-/* Filters Row */
-.roll-call-toolbar .toolbar-filters {
-	display: flex;
-	gap: var(--padding-sm);
-	flex-wrap: wrap;
-}
-
-.roll-call-toolbar .filter-field {
-	min-width: 150px;
-}
-
-.roll-call-toolbar .filter-field .frappe-control {
-	margin-bottom: 0;
-}
-
-.roll-call-toolbar .filter-field .form-group {
-	margin-bottom: 0;
-}
-
-.roll-call-toolbar .filter-field input {
-	height: 28px;
-	font-size: var(--text-sm);
-}
-
 /* Options (checkbox) - legacy styles kept for backwards compatibility */
 .roll-call-toolbar .toolbar-options {
 	display: flex;
@@ -150,62 +126,6 @@
 	display: flex;
 	align-items: center;
 	gap: var(--padding-sm);
-}
-
-/* Filters Dropdown */
-.roll-call-toolbar .filters-dropdown {
-	position: relative;
-}
-
-.roll-call-toolbar .filters-dropdown .dropdown-toggle {
-	display: flex;
-	align-items: center;
-	gap: 4px;
-	padding: 4px 8px;
-}
-
-.roll-call-toolbar .filters-dropdown .filter-label {
-	font-size: var(--text-sm);
-}
-
-.roll-call-toolbar .filters-dropdown-menu {
-	padding: var(--padding-md);
-	min-width: 280px;
-	max-height: none;
-	overflow: visible;
-	z-index: 1050;
-	background: var(--fg-color);
-	border: 1px solid var(--border-color);
-	border-radius: var(--border-radius);
-	box-shadow: var(--shadow-lg);
-}
-
-/* Ensure dropdown menu appears above everything when open */
-.roll-call-toolbar .filters-dropdown.show .filters-dropdown-menu {
-	display: block;
-}
-
-.roll-call-toolbar .filters-dropdown-menu .filter-field {
-	margin-bottom: var(--padding-md);
-}
-
-.roll-call-toolbar .filters-dropdown-menu .filter-field:last-child {
-	margin-bottom: 0;
-}
-
-/* Ensure frappe controls display properly in dropdown */
-.roll-call-toolbar .filters-dropdown-menu .frappe-control {
-	margin-bottom: 0;
-}
-
-.roll-call-toolbar .filters-dropdown-menu .form-group {
-	margin-bottom: 0;
-}
-
-.roll-call-toolbar .filters-dropdown-menu .control-label {
-	font-size: var(--text-xs);
-	color: var(--text-muted);
-	margin-bottom: 4px;
 }
 
 /* Leave Notice Badges - Using Frappe indicator colors */
@@ -248,6 +168,24 @@
 	background-color: var(--blue-200, #bfdbfe);
 	color: var(--blue-800, #1e40af);
 	border-color: var(--blue-400, #60a5fa);
+}
+
+.roll-call-toolbar .leave-badge-review {
+	background-color: var(--orange-100, #ffedd5);
+	color: var(--orange-700, #c2410c);
+	border-color: var(--orange-300, #fdba74);
+	text-decoration: none;
+}
+
+.roll-call-toolbar .leave-badge-review:hover,
+.roll-call-toolbar .leave-badge-review.active {
+	background-color: var(--orange-200, #fed7aa);
+	color: var(--orange-800, #9a3412);
+	border-color: var(--orange-400, #fb923c);
+}
+
+.roll-call-toolbar .leave-badge-review .badge-text {
+	margin-right: 4px;
 }
 
 .roll-call-toolbar .leave-badge .badge-count {
@@ -652,17 +590,13 @@
    ===================================================== */
 
 .roll-call-table .weekend-separator {
-	width: 8px !important;
-	min-width: 8px !important;
-	max-width: 8px !important;
-	padding: 0 !important;
-	background: var(--gray-300) !important;
-	border-left: none !important;
-	border-right: none !important;
+	border-left-width: 3px !important;
+	border-left-style: solid !important;
+	border-left-color: var(--gray-300) !important;
 }
 
 [data-theme="dark"] .roll-call-table .weekend-separator {
-	background: var(--gray-600) !important;
+	border-left-color: var(--gray-600) !important;
 }
 
 /* =====================================================
@@ -733,6 +667,8 @@
 /* Cell with entry - use presence color (Frappe --bg-{color} vars auto-adapt to dark mode) */
 .roll-call-table .day-cell.has-entry {
 	background-color: var(--presence-color, var(--bg-light-gray));
+	/* Remove border-radius so color fills entire square cell */
+	border-radius: 0;
 }
 
 /* =====================================================
@@ -949,20 +885,31 @@
 	padding: 0;
 }
 
-.split-cell {
+.roll-call-table .day-cell.split-day .split-cell,
+.roll-call-grid .day-cell.split-day .split-cell {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
 	display: flex;
 	flex-direction: column;
 	height: 100%;
 	width: 100%;
+	margin: 0;
+	padding: 0;
 }
 
 .split-am,
 .split-pm {
-	flex: 1;
+	flex: 1 1 50%;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	background-color: var(--presence-color, var(--bg-light-gray));
+	margin: 0;
+	padding: 0;
+	min-height: 0;
 }
 
 .split-am {
@@ -1008,8 +955,8 @@
 .roll-call-palette {
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
-	padding: 10px 12px;
+	gap: 6px;
+	padding: 8px 12px;
 	background: var(--fg-color);
 	border: 1px solid var(--border-color);
 	border-top: none;
@@ -1019,34 +966,38 @@
 	background: var(--gray-900);
 }
 
-/* Normal palette - 3 column layout */
+/* Normal palette - compact horizontal layout */
 .palette-normal {
 	display: flex;
-	gap: 16px;
+	gap: 12px;
 	flex-wrap: wrap;
+	align-items: flex-start;
 }
 
 .palette-column {
 	display: flex;
-	flex-direction: column;
+	align-items: center;
 	gap: 6px;
-	padding: 8px 12px;
+	padding: 0;
 	background: transparent;
 	border-radius: 0;
 	border: none;
 	border-right: 1px solid var(--border-color);
+	padding-right: 12px;
 }
 
 .palette-column:last-of-type {
 	border-right: none;
+	padding-right: 0;
 }
 
 .palette-column-label {
-	font-size: var(--text-xs);
+	font-size: var(--text-2xs);
 	font-weight: 600;
 	color: var(--text-muted);
 	text-transform: uppercase;
 	letter-spacing: 0.03em;
+	white-space: nowrap;
 }
 
 .palette-column-items {
@@ -1073,7 +1024,7 @@
 	display: flex;
 	align-items: center;
 	gap: 4px;
-	padding: 5px 10px;
+	padding: 4px 10px;
 	border: 1px solid var(--border-color);
 	border-radius: var(--border-radius);
 	background: var(--item-color, var(--card-bg));
@@ -1081,6 +1032,15 @@
 	transition: all 0.15s ease;
 	font-size: var(--text-sm);
 	color: var(--text-color);
+}
+
+.palette-icon {
+	font-size: 14px;
+	line-height: 1;
+}
+
+.palette-label {
+	line-height: 1.2;
 }
 
 .palette-item:hover {
@@ -1115,9 +1075,10 @@
 /* Disabled state - no permission to use this type */
 .palette-item.disabled,
 .palette-item:disabled {
-	opacity: 0.4;
+	opacity: 0.6;
 	cursor: not-allowed;
 	pointer-events: none;
+	border-style: dashed;
 }
 
 .palette-item.disabled:hover,
@@ -1125,6 +1086,18 @@
 	transform: none;
 	border-color: var(--border-color);
 	background: var(--item-color, var(--card-bg));
+}
+
+/* System types - legend only, not clickable */
+.palette-item.palette-system-item {
+	cursor: default;
+	opacity: 0.8;
+	border-style: dotted;
+}
+
+.palette-item.palette-system-item:hover {
+	transform: none;
+	border-color: var(--border-color);
 }
 
 .palette-item.palette-action {
@@ -1215,31 +1188,50 @@
 	display: none;
 }
 
-/* Split mode palette - AM/PM rows with same layout as normal palette */
+/* Split mode palette - AM/PM rows */
 .palette-split-mode {
 	display: flex;
 	flex-direction: column;
-	gap: 12px;
+	gap: 8px;
 }
 
 .split-palette-row {
 	display: flex;
-	gap: 16px;
-	align-items: flex-start;
-	flex-wrap: nowrap;
+	gap: 8px;
+	align-items: center;
+	flex-wrap: wrap;
+}
+
+/* Override horizontal layout for split mode columns */
+.split-palette-row .palette-column {
+	flex-direction: row;
+	align-items: center;
+	gap: 6px;
+	border-right: 1px solid var(--border-color);
+	padding-right: 8px;
+}
+
+.split-palette-row .palette-column:last-of-type {
+	border-right: none;
+	padding-right: 0;
 }
 
 .split-palette-row .palette-column-items {
-	flex-wrap: nowrap;
+	flex-wrap: wrap;
+	gap: 4px;
 }
 
 .split-palette-label {
-	font-size: var(--text-lg);
+	font-size: var(--text-base);
 	font-weight: 700;
 	color: var(--text-color);
-	min-width: 32px;
+	min-width: 28px;
 	flex-shrink: 0;
-	padding-top: 24px;  /* Align with palette items */
+}
+
+/* Compact split items - icon only */
+.palette-split-item .palette-label {
+	display: none;
 }
 
 /* Split palette items use same styling as normal palette items */
@@ -2479,13 +2471,74 @@
 		margin-top: var(--padding-sm);
 	}
 
-	.roll-call-toolbar .toolbar-filters {
-		justify-content: center;
-	}
-
 	.selection-toolbar {
 		flex-wrap: wrap;
 		gap: var(--padding-sm);
+	}
+
+	/* Mobile palette: compact icon-only view */
+	.palette-column {
+		padding: 6px 8px;
+		gap: 4px;
+	}
+
+	.palette-column-label {
+		font-size: 9px;
+	}
+
+	.palette-column-items {
+		gap: 3px;
+	}
+
+	.palette-item {
+		padding: 4px 6px;
+		font-size: var(--text-xs);
+	}
+
+	.palette-item .palette-label {
+		display: none;
+	}
+
+	.palette-item .palette-icon {
+		font-size: 14px;
+	}
+
+	/* Simpler disabled indicator on mobile */
+	.palette-item.disabled,
+	.palette-item:disabled {
+		opacity: 0.35;
+		border-style: solid;
+	}
+
+	/* Split mode palette on mobile */
+	.palette-split-mode {
+		gap: 8px;
+	}
+
+	.split-palette-row {
+		flex-wrap: wrap;
+		gap: 8px;
+	}
+
+	.split-palette-row .palette-column-items {
+		flex-wrap: wrap;
+	}
+
+	.split-palette-label {
+		font-size: var(--text-base);
+		min-width: 28px;
+	}
+
+	.palette-split-item {
+		padding: 4px 6px;
+	}
+
+	.palette-split-item .palette-label {
+		display: none;
+	}
+
+	.palette-split-item .palette-icon {
+		font-size: 14px;
 	}
 }
 

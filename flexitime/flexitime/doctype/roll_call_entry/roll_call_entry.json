@@ -101,13 +101,14 @@
   },
   {
    "default": "0",
-   "description": "True if split AM/PM presence",
+   "description": "Check to split presence between morning and afternoon",
    "fieldname": "is_half_day",
    "fieldtype": "Check",
    "label": "Split AM/PM"
   },
   {
    "depends_on": "eval:doc.is_half_day && !doc.am_presence_type",
+   "description": "Which half of the day this presence applies to",
    "fieldname": "half_day_type",
    "fieldtype": "Select",
    "label": "Half Day Type",
@@ -115,10 +116,11 @@
   },
   {
    "default": "Manual",
+   "description": "How this entry was created: Manual, Leave Application, System, or Work Pattern",
    "fieldname": "source",
    "fieldtype": "Select",
    "label": "Source",
-   "options": "Manual\nLeave\nSystem",
+   "options": "Manual\nLeave\nSystem\nPattern",
    "reqd": 1
   },
   {
@@ -174,10 +176,10 @@
   },
   {
    "default": "0",
-   "description": "True if week has closed (locked)",
+   "description": "Entry is locked and cannot be edited",
    "fieldname": "is_locked",
    "fieldtype": "Check",
-   "label": "Is Locked",
+   "label": "Locked",
    "read_only": 1
   },
   {
@@ -219,6 +221,16 @@
    "report": 1,
    "role": "HR Manager",
    "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR User",
    "write": 1
   },
   {

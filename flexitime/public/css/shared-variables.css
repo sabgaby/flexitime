@@ -1,0 +1,47 @@
+/**
+ * Shared CSS Variables for Flexitime
+ * 
+ * Uses Frappe's standard CSS variables for light/dark mode compatibility.
+ * These variables are used across both desk and portal versions.
+ */
+
+/* ============================================
+   Presence Color Variables
+   ============================================
+   Uses Frappe's standard color system (var(--bg-{color}))
+   which automatically adapts to light/dark themes.
+   */
+
+:root {
+	/* Presence colors - use Frappe's standard color variables */
+	--presence-blue: var(--bg-blue);
+	--presence-green: var(--bg-green);
+	--presence-orange: var(--bg-orange);
+	--presence-yellow: var(--bg-yellow);
+	--presence-red: var(--bg-red);
+	--presence-purple: var(--bg-purple);
+	--presence-pink: var(--bg-pink);
+	--presence-cyan: var(--bg-cyan);
+	--presence-gray: var(--bg-gray);
+	--presence-grey: var(--bg-gray); /* Alias for gray */
+	
+	/* Default presence color */
+	--presence-default: var(--bg-light-gray);
+	
+	/* Grid cell states */
+	--cell-today-bg: var(--bg-yellow);
+	--cell-weekend-bg: var(--bg-light-gray);
+	--cell-hover-bg: var(--bg-light-gray);
+	--cell-selected-bg: var(--bg-blue);
+	--cell-editable-border: var(--border-color);
+	
+	/* Common spacing for grid */
+	--grid-cell-padding: 4px;
+	--grid-cell-min-width: 44px;
+	--grid-employee-col-width: 180px;
+	
+	/* Common border radius */
+	--grid-cell-radius: var(--border-radius, 4px);
+}
+
+/* Dark mode is handled automatically by Frappe's CSS variables */

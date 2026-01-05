@@ -8,13 +8,11 @@
   "roll_call_start_day",
   "column_break_roll_call",
   "roll_call_display_name",
-  "display_section",
-  "calendar_display_name",
   "google_calendar_section",
   "enable_calendar_sync",
-  "absences_calendar_id",
+  "calendar_mode",
   "column_break_calendar",
-  "calendar_manager",
+  "shared_leave_calendar_id",
   "auto_lock_section",
   "enable_auto_lock",
   "auto_lock_after_days",
@@ -23,7 +21,12 @@
   "enable_submission_reminders",
   "submission_reminder_day",
   "column_break_reminder",
-  "reminder_email_template"
+  "reminder_email_template",
+  "leave_integration_section",
+  "sick_leave_type",
+  "column_break_leave",
+  "holiday_presence_type",
+  "day_off_presence_type"
  ],
  "fields": [
   {
@@ -52,50 +55,37 @@
    "options": "Full Name\nNickname\nNickname (Full Name)\nFull Name (Nickname)"
   },
   {
-   "fieldname": "display_section",
-   "fieldtype": "Section Break",
-   "label": "Calendar Feed"
-  },
-  {
-   "default": "Nickname",
-   "description": "How to display employee names in calendar events (e.g. 'Gaby 😎 Vacation')",
-   "fieldname": "calendar_display_name",
-   "fieldtype": "Select",
-   "label": "Calendar Display Name",
-   "options": "Nickname\nFull Name\nNickname (Full Name)\nFull Name (Nickname)"
-  },
-  {
    "fieldname": "google_calendar_section",
    "fieldtype": "Section Break",
    "label": "Google Calendar Integration",
-   "description": "Automatically create calendar events when leave is approved (requires Google Workspace app)"
+   "description": "Automatically create calendar events when leave is approved. Employee creates the event using their own Google authorization."
   },
   {
    "default": "0",
-   "description": "Create Google Calendar events when leave is approved. Employee will receive an invitation and appear as busy.",
+   "description": "Create Google Calendar events when leave is approved.",
    "fieldname": "enable_calendar_sync",
    "fieldtype": "Check",
    "label": "Enable Calendar Sync"
   },
   {
+   "default": "Primary Calendar",
    "depends_on": "enable_calendar_sync",
-   "description": "Calendar ID for the shared Absences calendar. Use 'primary' for the manager's main calendar, or a specific calendar ID (e.g. 'absences@company.com').",
-   "fieldname": "absences_calendar_id",
-   "fieldtype": "Data",
-   "label": "Absences Calendar ID",
-   "default": "primary"
+   "description": "Primary: Event in employee's own calendar. Shared: Event in company-wide leave calendar (requires all employees to have write access).",
+   "fieldname": "calendar_mode",
+   "fieldtype": "Select",
+   "label": "Calendar Mode",
+   "options": "Primary Calendar\nShared Leave Calendar"
   },
   {
    "fieldname": "column_break_calendar",
    "fieldtype": "Column Break"
   },
   {
-   "depends_on": "enable_calendar_sync",
-   "description": "User account that manages the Absences calendar. Must have Google Workspace authorized.",
-   "fieldname": "calendar_manager",
-   "fieldtype": "Link",
-   "label": "Calendar Manager",
-   "options": "User"
+   "depends_on": "eval:doc.enable_calendar_sync && doc.calendar_mode == 'Shared Leave Calendar'",
+   "description": "Calendar ID for the shared leave calendar. All employees must have write access to this calendar.",
+   "fieldname": "shared_leave_calendar_id",
+   "fieldtype": "Data",
+   "label": "Shared Leave Calendar ID"
   },
   {
    "fieldname": "auto_lock_section",
@@ -153,6 +143,36 @@
    "fieldtype": "Link",
    "label": "Reminder Email Template",
    "options": "Email Template"
+  },
+  {
+   "fieldname": "leave_integration_section",
+   "fieldtype": "Section Break",
+   "label": "Leave Integration"
+  },
+  {
+   "description": "Specify which Leave Type is used for sick leave. This enables incapacity to work declaration and sick leave reason fields.",
+   "fieldname": "sick_leave_type",
+   "fieldtype": "Link",
+   "label": "Sick Leave Type",
+   "options": "Leave Type"
+  },
+  {
+   "fieldname": "column_break_leave",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Specify which Presence Type represents holidays from the Holiday List",
+   "fieldname": "holiday_presence_type",
+   "fieldtype": "Link",
+   "label": "Holiday Presence Type",
+   "options": "Presence Type"
+  },
+  {
+   "description": "Presence Type used for scheduled days off from Employee Work Pattern",
+   "fieldname": "day_off_presence_type",
+   "fieldtype": "Link",
+   "label": "Day Off Presence Type",
+   "options": "Presence Type"
   }
  ],
  "issingle": 1,

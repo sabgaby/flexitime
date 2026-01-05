@@ -43,9 +43,8 @@ Fixtures:
 
 app_name = "flexitime"
 app_title = "Flexitime"
-app_publisher = "Gaby"
+app_publisher = "Gabs"
 app_description = "Swiss-compliant time tracking with flexitime balance management"
-app_email = "gaby@swisscluster.ch"
 app_license = "mit"
 
 # Apps
@@ -66,8 +65,32 @@ add_to_apps_screen = [
 # ------------------
 
 # include js, css files in header of desk.html
-app_include_css = "/assets/flexitime/css/flexitime.css"
-# app_include_js = ""
+# Load shared CSS variables and base styles first, then desk-specific styles
+app_include_css = [
+	"/assets/flexitime/css/shared-variables.css",
+	"/assets/flexitime/css/roll-call-base.css",
+	"/assets/flexitime/css/flexitime.css"
+]
+# Load shared utilities globally (used by multiple pages)
+# Also load roll-call modules globally (they're lightweight and only used on roll-call page)
+# RollCallTable is shared between desk app and portal - changes automatically apply to both
+app_include_js = [
+	"/assets/flexitime/js/utils/date-utils.js",
+	"/assets/flexitime/js/utils/color-utils.js",
+	"/assets/flexitime/js/roll-call/utils/presence-utils.js",
+	"/assets/flexitime/js/roll-call/shared/DateRangeCalculator.js",
+	"/assets/flexitime/js/roll-call/grid/GridRenderer.js",
+	"/assets/flexitime/js/roll-call/interactions/SelectionManager.js",
+	"/assets/flexitime/js/roll-call/interactions/EventManager.js",
+	"/assets/flexitime/js/roll-call/interactions/ClipboardManager.js",
+	"/assets/flexitime/js/roll-call/interactions/UndoManager.js",
+	"/assets/flexitime/js/roll-call/data/DataManager.js",
+	"/assets/flexitime/js/roll-call/dialogs/PresenceDialog.js",
+	"/assets/flexitime/js/roll-call/dialogs/LeaveDialogs.js",
+	"/assets/flexitime/js/roll-call/dialogs/BulkDialog.js",
+	"/assets/flexitime/js/roll-call/palette/PaletteRenderer.js",
+	"/assets/flexitime/js/roll-call/RollCallTable.js"
+]
 
 # Installation
 # ------------
@@ -81,6 +104,10 @@ doc_events = {
 	"Leave Application": {
 		"before_submit": "flexitime.flexitime.events.leave_application.before_submit",
 		"on_update": "flexitime.flexitime.events.leave_application.on_update"
+	},
+	"Leave Allocation": {
+		"before_validate": "flexitime.flexitime.events.leave_allocation.before_validate",
+		"validate": "flexitime.flexitime.events.leave_allocation.validate"
 	}
 }
 

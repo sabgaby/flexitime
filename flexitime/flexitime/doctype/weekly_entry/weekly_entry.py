@@ -4,16 +4,47 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import getdate, add_days, now_datetime
+from frappe.utils import getdate, add_days, now_datetime, today, format_date
 
 
 class WeeklyEntry(Document):
+	def autoname(self):
+		"""Generate name using employee and ISO calendar week.
+
+		Format: {employee}-{year}-W{week_number}
+		Example: HR-EMP-00001-2025-W03
+
+		Uses ISO week numbering where Week 1 is the first week with a Thursday.
+		Also sets the calendar_week field for display and filtering.
+		"""
+		if self.employee and self.week_start:
+			week_start = getdate(self.week_start)
+			# ISO week number (1-53)
+			iso_calendar = week_start.isocalendar()
+			year = iso_calendar[0]  # ISO year (can differ from calendar year at year boundaries)
+			week_num = iso_calendar[1]
+			self.name = f"{self.employee}-{year}-W{week_num:02d}"
+			# Set calendar_week field for display and filtering
+			self.calendar_week = f"{year}-W{week_num:02d}"
+
 	def validate(self):
 		self.set_week_end()
+		self.set_calendar_week()
 		self.validate_week_start_is_monday()
 		self.validate_locked()
 		self.validate_no_hours_on_leave_days()
+		self.validate_sequential_submission()
+		self.validate_week_complete()
 		self.calculate_totals()
+
+	def set_calendar_week(self):
+		"""Set calendar_week field from week_start using ISO week numbering."""
+		if self.week_start:
+			week_start = getdate(self.week_start)
+			iso_calendar = week_start.isocalendar()
+			year = iso_calendar[0]
+			week_num = iso_calendar[1]
+			self.calendar_week = f"{year}-W{week_num:02d}"
 
 	def validate_no_hours_on_leave_days(self):
 		"""Prevent submission if leave days have actual hours recorded.
@@ -35,6 +66,90 @@ class WeeklyEntry(Document):
 					title=_("Invalid Hours on Leave Days")
 				)
 
+	def validate_sequential_submission(self):
+		"""Ensure Weekly Entries are submitted in chronological order.
+
+		Prevents submitting a week if the previous week hasn't been submitted yet.
+		This ensures the running balance chain remains accurate.
+
+		Exception: The first week for an employee (no previous entries exist) can be submitted.
+		HR Managers can bypass this validation if needed.
+		"""
+		# Only validate when trying to submit
+		if not (self.docstatus == 0 and self._action == "submit"):
+			return
+
+		# HR Managers can bypass sequential validation
+		if "HR Manager" in frappe.get_roles():
+			return
+
+		week_start = getdate(self.week_start)
+		prev_week_start = add_days(week_start, -7)
+
+		# Check if previous week's entry exists
+		prev_entry = frappe.db.get_value("Weekly Entry",
+			{"employee": self.employee, "week_start": prev_week_start},
+			["name", "docstatus"],
+			as_dict=True
+		)
+
+		if prev_entry:
+			# Previous week entry exists - must be submitted first
+			if prev_entry.docstatus != 1:
+				frappe.throw(
+					_("Cannot submit this Weekly Entry. The previous week ({0}) must be submitted first.<br><br>"
+					  "Please submit <a href='/app/weekly-entry/{1}'>{1}</a> before submitting this entry."
+					  ).format(frappe.format_date(prev_week_start), prev_entry.name),
+					title=_("Previous Week Not Submitted")
+				)
+		else:
+			# No previous week entry - check if any earlier entries exist
+			earlier_unsubmitted = frappe.db.sql("""
+				SELECT name, week_start FROM `tabWeekly Entry`
+				WHERE employee = %s
+				AND week_start < %s
+				AND docstatus = 0
+				ORDER BY week_start DESC
+				LIMIT 1
+			""", (self.employee, week_start), as_dict=True)
+
+			if earlier_unsubmitted:
+				frappe.throw(
+					_("Cannot submit this Weekly Entry. You have an earlier unsubmitted week ({0}).<br><br>"
+					  "Please submit <a href='/app/weekly-entry/{1}'>{1}</a> first to maintain balance continuity."
+					  ).format(
+						frappe.format_date(earlier_unsubmitted[0].week_start),
+						earlier_unsubmitted[0].name
+					),
+					title=_("Earlier Week Not Submitted")
+				)
+
+	def validate_week_complete(self):
+		"""Prevent submission if week hasn't ended yet.
+
+		Weekly Entry can only be submitted after the week ends (after Sunday).
+		HR Managers can bypass this validation.
+		"""
+		# Only validate when trying to submit
+		if not (self.docstatus == 0 and self._action == "submit"):
+			return
+
+		# HR Managers can bypass
+		if "HR Manager" in frappe.get_roles():
+			return
+
+		week_end = getdate(self.week_end)
+		current_date = getdate(today())
+
+		if current_date <= week_end:
+			frappe.throw(
+				_("Cannot submit Weekly Entry before the week is complete.<br><br>"
+				  "Week ends on {0}. Please submit after that date.").format(
+					format_date(week_end)
+				),
+				title=_("Week Not Complete")
+			)
+
 	def set_week_end(self):
 		"""Auto-set week_end to 6 days after week_start"""
 		if self.week_start:
@@ -55,11 +170,17 @@ class WeeklyEntry(Document):
 
 	def calculate_totals(self):
 		"""Calculate all totals from daily entries"""
+		from flexitime.flexitime.doctype.employee_work_pattern.employee_work_pattern import get_work_pattern
+		from flexitime.flexitime.utils import calculate_weekly_expected_hours_with_holidays
+
 		self.total_actual_hours = sum(d.actual_hours or 0 for d in self.daily_entries)
-		
+
+		# Store reference to the work pattern used for this calculation
+		pattern = get_work_pattern(self.employee, self.week_start)
+		self.work_pattern = pattern.name if pattern else None
+
 		# Calculate expected hours using holiday-adjusted calculation
 		# This accounts for FTE percentage, holidays, and leaves proportionally
-		from flexitime.flexitime.utils import calculate_weekly_expected_hours_with_holidays
 		try:
 			self.total_expected_hours = calculate_weekly_expected_hours_with_holidays(
 				self.employee, self.week_start
@@ -92,7 +213,11 @@ class WeeklyEntry(Document):
 
 		# Get previous week's balance
 		prev_entry = get_previous_weekly_entry(self.employee, self.week_start)
-		self.previous_balance = prev_entry.running_balance if prev_entry else 0
+		if prev_entry:
+			self.previous_balance = prev_entry.running_balance
+		else:
+			# No previous entry - use initial balance from work pattern
+			self.previous_balance = get_initial_balance(self.employee, self.week_start)
 		self.running_balance = self.previous_balance + self.weekly_delta
 
 	def before_save(self):
@@ -121,9 +246,10 @@ class WeeklyEntry(Document):
 						daily.presence_type_icon = pt.icon
 						daily.presence_type_label = pt.label
 
-				# Recalculate expected hours based on presence type
+				# Recalculate expected hours (approved leaves reduce to 0)
+				has_approved_leave = bool(roll_call.leave_application)
 				daily.expected_hours = calculate_expected_hours(
-					self.employee, daily.date, roll_call.presence_type, roll_call.is_half_day
+					self.employee, daily.date, has_approved_leave, roll_call.is_half_day
 				)
 
 	def on_submit(self):
@@ -189,6 +315,28 @@ def get_previous_weekly_entry(employee, week_start):
 	return None
 
 
+def get_initial_balance(employee, week_start):
+	"""Get the initial balance from the employee's work pattern.
+
+	This is used when there's no previous Weekly Entry to carry forward a balance.
+	The initial_balance field in Employee Work Pattern allows setting a starting
+	balance for existing employees or carrying over from a previous system.
+
+	Args:
+		employee: Employee ID
+		week_start: Monday of the week (used to find applicable work pattern)
+
+	Returns:
+		float: Initial balance in hours, or 0 if not set
+	"""
+	from flexitime.flexitime.doctype.employee_work_pattern.employee_work_pattern import get_work_pattern
+
+	pattern = get_work_pattern(employee, week_start)
+	if pattern:
+		return pattern.initial_balance or 0
+	return 0
+
+
 def recalculate_future_balances(employee, from_week_start):
 	"""Recalculate running balances for all weeks after the given week
 
@@ -213,7 +361,10 @@ def recalculate_future_balances(employee, from_week_start):
 		doc = frappe.get_doc("Weekly Entry", entry.name)
 		# Recalculate with updated previous balance
 		prev_entry = get_previous_weekly_entry(employee, doc.week_start)
-		doc.previous_balance = prev_entry.running_balance if prev_entry else 0
+		if prev_entry:
+			doc.previous_balance = prev_entry.running_balance
+		else:
+			doc.previous_balance = get_initial_balance(employee, doc.week_start)
 		doc.running_balance = doc.previous_balance + doc.weekly_delta
 		doc.db_set("previous_balance", doc.previous_balance)
 		doc.db_set("running_balance", doc.running_balance)
@@ -231,64 +382,40 @@ def recalculate_future_balances(employee, from_week_start):
 			"custom_flexitime_balance", latest[0].running_balance)
 
 
-def calculate_expected_hours(employee, date, presence_type, is_half_day=False):
-	"""Calculate expected hours based on presence type and work pattern
+def calculate_expected_hours(employee, date, has_approved_leave=False, is_half_day=False):
+	"""Calculate expected hours based on work pattern, holidays, and approved leaves.
 
 	Logic:
-	- System types (weekend, holiday, day_off): expected = 0
-	- Leave types with deducts_from_flextime_balance (flex_off): expected = pattern hours
-	- Regular leave (vacation, sick): expected = 0 (neutral balance impact)
-	- Working types (office, home, etc): expected = pattern hours
+	1. Start with work pattern hours for the day (day_off in pattern = 0)
+	2. If it's a holiday (from Holiday List): expected = 0
+	3. If there's an approved leave: expected = 0 (or half if half-day)
+	4. Roll Call presence types are just for reference - they don't affect expected hours
 
 	Args:
 		employee: Employee ID
 		date: The date
-		presence_type: Presence Type name
+		has_approved_leave: Whether there's an approved Leave Application
 		is_half_day: Whether this is a half-day leave
 
 	Returns:
 		float: Expected hours
 	"""
 	from flexitime.flexitime.doctype.employee_work_pattern.employee_work_pattern import get_work_pattern
+	from flexitime.flexitime.utils import is_holiday
 
-	if not presence_type:
-		return 0
-
-	# Get presence type settings
-	pt = frappe.get_cached_value("Presence Type", presence_type,
-		["category", "is_system", "requires_leave_application", "deducts_from_flextime_balance"],
-		as_dict=True)
-
-	if not pt:
-		return 0
-
-	# System types (weekend, holiday, day_off): expected = 0
-	if pt.is_system:
-		return 0
-
-	# Get normal hours from Work Pattern
 	pattern = get_work_pattern(employee, date)
 	normal_hours = pattern.get_hours_for_weekday(date) if pattern else 8
 
-	# Leave types that require approval
-	if pt.requires_leave_application:
-		# Flex Off types: keep pattern hours so balance is deducted
-		if pt.deducts_from_flextime_balance:
-			if is_half_day:
-				return normal_hours / 2
-			return normal_hours
+	# Holidays from Holiday List = 0 expected hours
+	if is_holiday(date, employee):
+		return 0
 
-		# Regular leave (vacation, sick): expected = 0 (neutral balance)
+	# Approved leaves reduce expected hours
+	if has_approved_leave:
 		if is_half_day:
-			# Half day leave = half of normal hours
 			return normal_hours / 2
 		return 0
 
-	# Scheduled category without is_system (should not happen, but handle it)
-	if pt.category == "Scheduled":
-		return 0
-
-	# Working category = hours from Work Pattern
 	return normal_hours
 
 
@@ -328,30 +455,44 @@ def get_week_data(employee, week_start):
 	from flexitime.flexitime.doctype.employee_work_pattern.employee_work_pattern import get_work_pattern
 
 	week_start = getdate(week_start)
-	days_of_week = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+	week_end = add_days(week_start, 4)  # Friday (Mon-Fri = 5 days)
+	days_of_week = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
 	days = []
 
-	for i in range(7):
-		date = add_days(week_start, i)
+	# Get existing weekly entry data to preserve actual_hours
+	existing_entry_name = frappe.db.get_value("Weekly Entry",
+		{"employee": employee, "week_start": week_start},
+		"name"
+	)
+	existing_actual_hours = {}
+	if existing_entry_name:
+		existing_daily_entries = frappe.get_all("Daily Entry",
+			filters={"parent": existing_entry_name},
+			fields=["date", "actual_hours"]
+		)
+		for entry in existing_daily_entries:
+			existing_actual_hours[str(entry.date)] = entry.actual_hours
 
-		# Get roll call entry if exists
+	# Only generate Mon-Fri (5 days) - users can manually add weekend rows if needed
+	for i in range(5):
+		date = add_days(week_start, i)
+		date_str = str(date)
+
+		# Get roll call entry if exists - explicitly querying to ensure it's fetched
 		roll_call = frappe.db.get_value("Roll Call Entry",
 			{"employee": employee, "date": date},
 			["presence_type", "leave_application", "is_half_day"],
 			as_dict=True
 		)
 
+		# Extract roll call data (roll_call will be None if no entry exists)
 		presence_type = roll_call.presence_type if roll_call else None
-		is_half_day = roll_call.is_half_day if roll_call else False
 		leave_application = roll_call.leave_application if roll_call else None
+		is_half_day = roll_call.is_half_day if roll_call else False
+		has_approved_leave = bool(leave_application)
 
-		# Get expected hours from work pattern
-		expected = calculate_expected_hours(employee, date, presence_type, is_half_day)
-
-		# Default expected if no roll call
-		if expected == 0 and not roll_call:
-			pattern = get_work_pattern(employee, date)
-			expected = pattern.get_hours_for_weekday(date) if pattern else 8
+		# Get expected hours (approved leaves reduce to 0)
+		expected = calculate_expected_hours(employee, date, has_approved_leave, is_half_day)
 
 		# Get presence type details
 		icon = label = None
@@ -362,11 +503,14 @@ def get_week_data(employee, week_start):
 				icon = pt.icon
 				label = pt.label
 
+		# Preserve existing actual_hours if available, otherwise leave as None/0
+		actual_hours = existing_actual_hours.get(date_str)
+
 		days.append({
-			"date": str(date),
+			"date": date_str,
 			"day_of_week": days_of_week[i],
 			"expected_hours": expected,
-			"actual_hours": expected,  # Default actual = expected
+			"actual_hours": actual_hours,  # Only use existing value, don't auto-fill
 			"presence_type": presence_type,
 			"presence_type_icon": icon,
 			"presence_type_label": label,
@@ -409,10 +553,10 @@ def create_weekly_entry(employee, week_start):
 		"week_start": week_start
 	})
 
-	days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+	days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
 
-	# Add 7 daily entries
-	for i in range(7):
+	# Add 5 daily entries (Mon-Fri) - users can manually add weekend rows if needed
+	for i in range(5):
 		date = add_days(week_start, i)
 
 		# Get roll call entry
@@ -423,11 +567,12 @@ def create_weekly_entry(employee, week_start):
 		)
 
 		presence_type = roll_call.presence_type if roll_call else None
-		is_half_day = roll_call.is_half_day if roll_call else False
 		leave_application = roll_call.leave_application if roll_call else None
+		is_half_day = roll_call.is_half_day if roll_call else False
+		has_approved_leave = bool(leave_application)
 
-		# Get expected hours
-		expected = calculate_expected_hours(employee, date, presence_type, is_half_day)
+		# Get expected hours (approved leaves reduce to 0)
+		expected = calculate_expected_hours(employee, date, has_approved_leave, is_half_day)
 
 		# Get timesheet hours
 		ts_hours = get_timesheet_hours(employee, date)

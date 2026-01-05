@@ -9,14 +9,15 @@ approved or cancelled, this module ensures all related records are updated.
 
 Event Flow:
     1. before_submit: Validates no hours are recorded for leave dates
-    2. on_update (Approved): Creates Roll Call entries, updates Weekly Entries,
-       creates Google Calendar event
+    2. on_update (Approved): Validates Google auth, creates Roll Call entries,
+       updates Weekly Entries, creates Google Calendar event
     3. on_update (Cancelled): Reverts Roll Call/Weekly entries, deletes
        Google Calendar event
 
 Key Functions:
     before_submit: Validates leave submission
     on_update: Handles approval/cancellation
+    validate_employee_google_auth: Checks employee has Google Calendar access
     update_roll_call_for_leave: Creates/updates Roll Call entries
     update_weekly_entries_for_leave: Updates Weekly Entry daily entries
     create_google_calendar_event: Syncs to Google Calendar
@@ -30,8 +31,8 @@ Dependencies:
 Configuration:
     Settings are in Flexitime Settings:
     - enable_calendar_sync: Enable/disable Google Calendar integration
-    - calendar_manager: User who manages the Absences calendar
-    - absences_calendar_id: Calendar ID for creating events
+    - calendar_mode: "Primary Calendar" or "Shared Leave Calendar"
+    - shared_leave_calendar_id: Calendar ID for shared mode
 """
 
 import frappe
@@ -42,12 +43,14 @@ from frappe.utils import getdate, add_days
 def before_submit(doc, method):
 	"""Validate before submitting leave application"""
 	validate_no_hours_recorded(doc)
+	validate_employee_google_auth(doc)  # Check auth BEFORE submit, not on approval
 
 
 def on_update(doc, method):
 	"""Handle Leave Application status changes"""
 	if doc.status == "Approved" and doc.docstatus == 1:
 		validate_no_submitted_weekly_entries(doc)
+		# Note: Google auth already validated in before_submit
 		update_roll_call_for_leave(doc)
 		update_weekly_entries_for_leave(doc)
 		create_google_calendar_event(doc)
@@ -121,6 +124,73 @@ def validate_no_submitted_weekly_entries(leave_app):
 		)
 
 
+def validate_employee_google_auth(leave_app):
+	"""Check if employee has Google auth for calendar sync.
+
+	Called during before_submit so the EMPLOYEE is blocked (not HR approver).
+
+	For Shared Leave Calendar mode: HARD requirement - blocks submission
+	For Primary Calendar mode: SOFT requirement - just logs warning
+
+	Args:
+		leave_app: Leave Application document
+
+	Raises:
+		frappe.ValidationError: If Shared mode and employee not authorized
+	"""
+	# Check if calendar sync is enabled
+	flexitime_settings = frappe.get_single("Flexitime Settings")
+	if not getattr(flexitime_settings, 'enable_calendar_sync', False):
+		return  # Calendar sync disabled, no auth needed
+
+	# Check if Google Workspace is enabled
+	if not frappe.db.exists("Google Workspace Settings"):
+		return
+
+	settings = frappe.get_single("Google Workspace Settings")
+	if not settings.enabled or not settings.enable_calendar:
+		return
+
+	calendar_mode = getattr(flexitime_settings, 'calendar_mode', 'Primary Calendar')
+
+	# Get employee's user account
+	employee_user = frappe.db.get_value("Employee", leave_app.employee, "user_id")
+	if not employee_user:
+		if calendar_mode == "Shared Leave Calendar":
+			frappe.throw(
+				_("Cannot submit leave request: Your employee record has no linked user account.<br><br>"
+				  "Please contact HR to link your user account to your employee record."),
+				title=_("User Account Required")
+			)
+		return  # Primary mode - soft fail, will skip calendar event
+
+	# Check if employee has Google auth
+	try:
+		user_doc = frappe.get_doc("User", employee_user)
+		if hasattr(user_doc, 'google_workspace_refresh_token'):
+			token = user_doc.get_password('google_workspace_refresh_token', raise_exception=False)
+			if token:
+				return  # Employee is authorized
+	except Exception:
+		pass
+
+	# Employee not authorized
+	if calendar_mode == "Shared Leave Calendar":
+		frappe.throw(
+			_("Cannot submit leave request: Google Calendar authorization required.<br><br>"
+			  "Please connect your Google account before requesting leave.<br><br>"
+			  "Open your Employee record → Integrations tab → Connect Google Account"),
+			title=_("Google Authorization Required")
+		)
+	else:
+		# Primary mode - just log, don't block
+		frappe.log_error(
+			f"Employee {leave_app.employee} ({employee_user}) has not authorized Google Workspace. "
+			"Calendar event will not be created.",
+			"Leave Calendar Sync - Auth Missing"
+		)
+
+
 def update_roll_call_for_leave(leave_app):
 	"""Update or create Roll Call Entries for approved leave
 
@@ -129,7 +199,7 @@ def update_roll_call_for_leave(leave_app):
 	"""
 	# Get corresponding Presence Type for this Leave Type
 	presence_type = frappe.db.get_value("Presence Type",
-		{"is_leave": 1, "leave_type": leave_app.leave_type})
+		{"requires_leave_application": 1, "leave_type": leave_app.leave_type})
 
 	if not presence_type:
 		frappe.msgprint(
@@ -192,7 +262,7 @@ def update_weekly_entries_for_leave(leave_app):
 		leave_app: Leave Application document
 	"""
 	presence_type = frappe.db.get_value("Presence Type",
-		{"is_leave": 1, "leave_type": leave_app.leave_type})
+		{"requires_leave_application": 1, "leave_type": leave_app.leave_type})
 
 	if not presence_type:
 		return
@@ -233,10 +303,10 @@ def update_weekly_entries_for_leave(leave_app):
 						indicator="orange"
 					)
 
-				# Recalculate expected hours
+				# Recalculate expected hours (approved leave = 0)
 				from flexitime.flexitime.doctype.weekly_entry.weekly_entry import calculate_expected_hours
 				daily.expected_hours = calculate_expected_hours(
-					doc.employee, daily_date, presence_type, is_half
+					doc.employee, daily_date, has_approved_leave=True, is_half_day=is_half
 				)
 
 				# Fetch icon and label
@@ -340,17 +410,18 @@ def revert_weekly_entries_for_leave(leave_app):
 						daily.presence_type_icon = pt.icon
 						daily.presence_type_label = pt.label
 
+					# Check if there's still an approved leave after revert
+					has_approved_leave = bool(roll_call.leave_application)
+					is_half_day = roll_call.is_half_day if roll_call else False
 					daily.expected_hours = calculate_expected_hours(
-						doc.employee, daily.date, roll_call.presence_type, roll_call.is_half_day
+						doc.employee, daily.date, has_approved_leave, is_half_day
 					)
 				else:
 					# No Roll Call Entry - clear to default state (working day)
 					daily.presence_type = None
 					daily.presence_type_icon = None
 					daily.presence_type_label = None
-					daily.expected_hours = calculate_expected_hours(
-						doc.employee, daily.date, None, False
-					)
+					daily.expected_hours = calculate_expected_hours(doc.employee, daily.date)
 
 		if changed:
 			doc.flags.ignore_permissions = True
@@ -360,8 +431,10 @@ def revert_weekly_entries_for_leave(leave_app):
 def create_google_calendar_event(leave_app):
 	"""Create a Google Calendar event for approved leave.
 
-	Creates an all-day event on the shared Absences calendar and invites
-	the employee so they appear as 'busy' during the leave period.
+	The employee creates the event using their own Google authorization.
+	Depending on calendar_mode setting:
+	- Primary Calendar: Event in employee's own calendar
+	- Shared Leave Calendar: Event in company-wide shared calendar
 
 	Args:
 		leave_app: Leave Application document
@@ -380,25 +453,22 @@ def create_google_calendar_event(leave_app):
 		if not getattr(flexitime_settings, 'enable_calendar_sync', False):
 			return
 
-		# Get the designated HR user who manages the Absences calendar
-		calendar_manager = getattr(flexitime_settings, 'calendar_manager', None)
-		if not calendar_manager:
-			# Fall back to any HR Manager with Google Workspace connected
-			calendar_manager = get_connected_hr_manager()
-			if not calendar_manager:
-				frappe.log_error(
-					"No HR Manager with Google Workspace authorized found",
-					"Leave Calendar Sync"
-				)
-				return
+		calendar_mode = getattr(flexitime_settings, 'calendar_mode', 'Primary Calendar')
 
-		# Get employee email
-		employee_email = frappe.db.get_value("Employee", leave_app.employee, "user_id")
-		if not employee_email:
-			frappe.log_error(
-				f"Employee {leave_app.employee} has no linked user",
-				"Leave Calendar Sync"
-			)
+		# Get employee's user account (they create the event)
+		employee_user = frappe.db.get_value("Employee", leave_app.employee, "user_id")
+		if not employee_user:
+			return  # Already validated in validate_employee_google_auth
+
+		# Check if employee has Google auth
+		try:
+			user_doc = frappe.get_doc("User", employee_user)
+			if not hasattr(user_doc, 'google_workspace_refresh_token'):
+				return
+			token = user_doc.get_password('google_workspace_refresh_token', raise_exception=False)
+			if not token:
+				return  # No auth, skip silently (already logged in validation)
+		except Exception:
 			return
 
 		# Get employee name for display
@@ -416,31 +486,35 @@ def create_google_calendar_event(leave_app):
 		else:
 			summary = f"{display_name} - {leave_type}"
 
-		# Build description
-		description = f"Leave Application: {leave_app.name}\n"
-		description += f"Employee: {employee_name}\n"
-		description += f"Leave Type: {leave_type}\n"
-		description += f"Period: {leave_app.from_date} to {leave_app.to_date}\n"
-		if leave_app.description:
-			description += f"\nReason: {leave_app.description}"
+		# Build description - just a link to the leave application
+		app_url = frappe.utils.get_url(f"/app/leave-application/{leave_app.name}")
+		description = f'<a href="{app_url}">Leave Application</a>'
 
-		# Create calendar service with the calendar manager's credentials
+		# Determine target calendar based on mode
+		if calendar_mode == "Shared Leave Calendar":
+			calendar_id = getattr(flexitime_settings, 'shared_leave_calendar_id', None)
+			if not calendar_id:
+				frappe.log_error(
+					"Shared Leave Calendar mode enabled but no calendar ID configured",
+					"Leave Calendar Sync"
+				)
+				return
+		else:
+			calendar_id = 'primary'  # Employee's main calendar
+
+		# Create calendar service with employee's credentials
 		from integration_hub.services.calendar import GoogleCalendarService
+		service = GoogleCalendarService(user=employee_user, calendar_id=calendar_id)
 
-		# Get the target calendar ID (shared Absences calendar)
-		calendar_id = getattr(flexitime_settings, 'absences_calendar_id', 'primary')
-
-		service = GoogleCalendarService(user=calendar_manager, calendar_id=calendar_id)
-
-		# Create the event
+		# Create the event (employee is organizer, no attendees needed)
 		result = service.create_event(
 			summary=summary,
 			start_date=str(leave_app.from_date),
 			end_date=str(leave_app.to_date),
 			description=description,
-			attendees=[employee_email],  # Invite the employee
+			attendees=[],  # No attendees - employee owns the event
 			all_day=True,
-			send_notifications=True,  # Send email invitation
+			send_notifications=False,  # No invitation needed
 			transparency="opaque"  # Mark as busy
 		)
 
@@ -454,11 +528,18 @@ def create_google_calendar_event(leave_app):
 				update_data, update_modified=False)
 			frappe.db.commit()
 
-			frappe.msgprint(
-				f"Calendar event created. {employee_name} will receive an invitation.",
-				indicator="green",
-				alert=True
-			)
+			if calendar_mode == "Shared Leave Calendar":
+				frappe.msgprint(
+					_("Leave added to shared calendar."),
+					indicator="green",
+					alert=True
+				)
+			else:
+				frappe.msgprint(
+					_("Leave added to {0}'s calendar.").format(display_name),
+					indicator="green",
+					alert=True
+				)
 
 	except Exception as e:
 		# Don't fail the leave approval if calendar sync fails
@@ -470,6 +551,8 @@ def create_google_calendar_event(leave_app):
 
 def delete_google_calendar_event(leave_app):
 	"""Delete the Google Calendar event when leave is cancelled.
+
+	Uses the employee's credentials to delete the event they created.
 
 	Args:
 		leave_app: Leave Application document
@@ -495,19 +578,26 @@ def delete_google_calendar_event(leave_app):
 		if not getattr(flexitime_settings, 'enable_calendar_sync', False):
 			return
 
-		calendar_manager = getattr(flexitime_settings, 'calendar_manager', None)
-		if not calendar_manager:
-			calendar_manager = get_connected_hr_manager()
-			if not calendar_manager:
+		calendar_mode = getattr(flexitime_settings, 'calendar_mode', 'Primary Calendar')
+
+		# Get employee's user account
+		employee_user = frappe.db.get_value("Employee", leave_app.employee, "user_id")
+		if not employee_user:
+			return
+
+		# Determine target calendar based on mode
+		if calendar_mode == "Shared Leave Calendar":
+			calendar_id = getattr(flexitime_settings, 'shared_leave_calendar_id', None)
+			if not calendar_id:
 				return
+		else:
+			calendar_id = 'primary'
 
-		# Delete the event
+		# Delete the event using employee's credentials
 		from integration_hub.services.calendar import GoogleCalendarService
+		service = GoogleCalendarService(user=employee_user, calendar_id=calendar_id)
 
-		calendar_id = getattr(flexitime_settings, 'absences_calendar_id', 'primary')
-		service = GoogleCalendarService(user=calendar_manager, calendar_id=calendar_id)
-
-		service.delete_event(event_id, send_notifications=True)
+		service.delete_event(event_id, send_notifications=False)
 
 		# Clear the stored event ID and URL
 		frappe.db.set_value("Leave Application", leave_app.name,
@@ -518,7 +608,7 @@ def delete_google_calendar_event(leave_app):
 		frappe.db.commit()
 
 		frappe.msgprint(
-			"Calendar event deleted. Attendees will be notified.",
+			_("Calendar event removed."),
 			indicator="blue",
 			alert=True
 		)
@@ -529,29 +619,3 @@ def delete_google_calendar_event(leave_app):
 			f"Failed to delete calendar event for {leave_app.name}: {str(e)}",
 			"Leave Calendar Sync"
 		)
-
-
-def get_connected_hr_manager():
-	"""Find an HR Manager with Google Workspace authorized.
-
-	Returns:
-		str: Username of the first HR Manager with a valid refresh token, or None
-	"""
-	# Get users with HR Manager role
-	hr_managers = frappe.get_all("Has Role", filters={
-		"role": "HR Manager",
-		"parenttype": "User"
-	}, fields=["parent"])
-
-	for hr in hr_managers:
-		user = hr.parent
-		try:
-			user_doc = frappe.get_doc("User", user)
-			if hasattr(user_doc, 'google_workspace_refresh_token'):
-				token = user_doc.get_password('google_workspace_refresh_token')
-				if token:
-					return user
-		except Exception:
-			continue
-
-	return None

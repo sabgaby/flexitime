@@ -5,3 +5,5 @@
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated
 flexitime.patches.v1_x.add_roll_call_entry_indexes
+flexitime.patches.v1_x.make_day_off_editable
+flexitime.patches.v1_x.set_work_pattern_status

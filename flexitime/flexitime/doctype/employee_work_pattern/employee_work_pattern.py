@@ -10,10 +10,29 @@ class EmployeeWorkPattern(Document):
 	def validate(self):
 		self.calculate_weekly_hours()
 		self.calculate_flexitime_limit()
+		self.set_status()
 		self.validate_hours()
 		self.validate_dates()
 		self.validate_overlapping()
 		self.validate_against_base_hours()
+
+	def set_status(self):
+		"""Auto-compute status based on validity dates.
+
+		Active = valid_from <= today AND (valid_to IS NULL OR valid_to >= today)
+		Inactive = pattern has ended (valid_to < today)
+		"""
+		today_date = getdate(today())
+
+		# Active if: valid_from <= today AND (valid_to is NULL OR valid_to >= today)
+		if getdate(self.valid_from) <= today_date:
+			if not self.valid_to or getdate(self.valid_to) >= today_date:
+				self.status = "Active"
+			else:
+				self.status = "Inactive"
+		else:
+			# Future pattern - still considered Active (not yet started but valid)
+			self.status = "Active"
 
 	def calculate_weekly_hours(self):
 		"""Auto-calculate total weekly expected hours"""
@@ -179,11 +198,11 @@ class EmployeeWorkPattern(Document):
 		self.create_day_off_entries()
 
 	def cleanup_stale_day_off_entries(self):
-		"""Delete system-generated day_off entries that are no longer valid under this pattern.
+		"""Delete pattern-generated day_off entries that are no longer valid under this pattern.
 
 		Only affects entries that:
 		- Are within this pattern's validity period
-		- Have source="System" (not manual entries)
+		- Have source="Pattern" or "System" (not manual entries)
 		- Are not locked
 		- Are on weekdays that are NO LONGER days off in this pattern
 		"""
@@ -193,13 +212,13 @@ class EmployeeWorkPattern(Document):
 		# Get this pattern's day-off weekdays (Mon-Fri with 0 hours)
 		new_day_offs = set(self.get_day_off_weekdays())
 
-		# Find day_off entries in range that are system-generated and not locked
+		# Find day_off entries in range that are pattern/system-generated and not locked
 		entries = frappe.get_all("Roll Call Entry",
 			filters={
 				"employee": self.employee,
 				"date": ["between", [from_date, to_date]],
 				"presence_type": "day_off",
-				"source": "System",
+				"source": ["in", ["Pattern", "System"]],
 				"is_locked": 0
 			},
 			fields=["name", "date"]
@@ -221,20 +240,65 @@ class EmployeeWorkPattern(Document):
 
 		Creates entries from valid_from to valid_to (or 1 year ahead if no end date).
 		Only creates if entry doesn't already exist for that date.
+		Uses source="Pattern" so employees can edit these entries (unlike "System").
 		"""
+		from datetime import date as date_type
+		
+		# Convert from_date to date object
 		from_date = getdate(self.valid_from)
-		to_date = getdate(self.valid_to) if self.valid_to else add_days(today(), 365)
+		if not isinstance(from_date, date_type):
+			from_date = getdate(str(from_date))
+		
+		# Ensure to_date is always a date object, handling None and empty string
+		if self.valid_to and str(self.valid_to).strip():
+			to_date_raw = getdate(self.valid_to)
+			# Ensure it's a date object (getdate might return datetime in some cases)
+			if isinstance(to_date_raw, date_type):
+				to_date = to_date_raw
+			elif hasattr(to_date_raw, 'date'):
+				# If it's a datetime, convert to date
+				to_date = to_date_raw.date()
+			else:
+				# If it's a string or something else, convert it
+				to_date = getdate(str(to_date_raw))
+				if not isinstance(to_date, date_type):
+					to_date = getdate(str(to_date))
+		else:
+			# No valid_to - use default (1 year from today)
+			to_date = add_days(today(), 365)
+			# Ensure it's a date object
+			if not isinstance(to_date, date_type):
+				to_date = getdate(str(to_date))
+		
+		# Final safety check: ensure both are date objects
+		if not isinstance(to_date, date_type):
+			to_date = getdate(str(to_date))
+		if not isinstance(from_date, date_type):
+			from_date = getdate(str(from_date))
 
 		# Get this pattern's day-off weekdays
 		day_off_weekdays = self.get_day_off_weekdays()
 		if not day_off_weekdays:
 			return
 
+		# Get day off presence type from Flexitime Settings
+		try:
+			settings = frappe.get_cached_doc("Flexitime Settings")
+			day_off_presence_type = settings.day_off_presence_type
+		except Exception:
+			# Fallback to default if settings not available
+			day_off_presence_type = "day_off" if frappe.db.exists("Presence Type", "day_off") else None
+
+		if not day_off_presence_type:
+			frappe.msgprint("Day Off Presence Type not configured in Flexitime Settings", indicator="orange")
+			return
+
 		# Get day_off presence type details
-		day_off_pt = frappe.get_cached_value("Presence Type", "day_off",
+		day_off_pt = frappe.get_cached_value("Presence Type", day_off_presence_type,
 			["icon", "label"], as_dict=True)
 
 		if not day_off_pt:
+			frappe.msgprint(f"Presence Type '{day_off_presence_type}' configured in Flexitime Settings not found", indicator="orange")
 			return
 
 		created_count = 0
@@ -249,10 +313,10 @@ class EmployeeWorkPattern(Document):
 						"doctype": "Roll Call Entry",
 						"employee": self.employee,
 						"date": current_date,
-						"presence_type": "day_off",
+						"presence_type": day_off_presence_type,
 						"presence_type_icon": day_off_pt.icon,
 						"presence_type_label": day_off_pt.label,
-						"source": "System",
+						"source": "Pattern",
 						"is_half_day": 0,
 					}).insert(ignore_permissions=True)
 					created_count += 1
