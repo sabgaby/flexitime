@@ -1,6 +1,6 @@
 {
  "actions": [],
- "creation": "2025-01-01 00:00:00.000000",
+ "creation": "2025-01-01 00:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -35,12 +35,12 @@
    "label": "Roll Call"
   },
   {
-   "default": "Today",
+   "default": "Current Day",
    "description": "The starting column when opening Roll Call page",
    "fieldname": "roll_call_start_day",
    "fieldtype": "Select",
    "label": "Roll Call Start Day",
-   "options": "Today\nStart of Week"
+   "options": "Current Day\nStart of Week"
   },
   {
    "fieldname": "column_break_roll_call",
@@ -55,10 +55,10 @@
    "options": "Full Name\nNickname\nNickname (Full Name)\nFull Name (Nickname)"
   },
   {
+   "description": "Automatically create calendar events when leave is approved. Employee creates the event using their own Google authorization.",
    "fieldname": "google_calendar_section",
    "fieldtype": "Section Break",
-   "label": "Google Calendar Integration",
-   "description": "Automatically create calendar events when leave is approved. Employee creates the event using their own Google authorization."
+   "label": "Google Calendar Integration"
   },
   {
    "default": "0",
@@ -177,8 +177,8 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2025-01-01 00:00:00.000000",
- "modified_by": "Administrator",
+ "modified": "2026-01-05 13:07:17.648133",
+ "modified_by": "hanna.deshchenko@swisscluster.com",
  "module": "Flexitime",
  "name": "Flexitime Settings",
  "owner": "Administrator",
@@ -198,6 +198,7 @@
    "role": "System Manager"
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],

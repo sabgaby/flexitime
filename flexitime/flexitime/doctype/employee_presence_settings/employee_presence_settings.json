@@ -8,9 +8,8 @@
   "employee",
   "employee_name",
   "section_break_flexitime",
-  "flexitime_balance",
-  "column_break_flexitime",
   "uses_timesheet",
+  "column_break_flexitime",
   "show_in_roll_call",
   "requires_weekly_entry",
   "section_break_permissions",
@@ -41,23 +40,15 @@
    "label": "Flexitime Settings"
   },
   {
-   "description": "Current running flexitime balance (hours)",
-   "fieldname": "flexitime_balance",
-   "fieldtype": "Float",
-   "label": "Flexitime Balance",
-   "precision": "1",
-   "read_only": 1
-  },
-  {
-   "fieldname": "column_break_flexitime",
-   "fieldtype": "Column Break"
-  },
-  {
    "default": "0",
    "description": "Employee uses ERPNext Timesheets for time tracking",
    "fieldname": "uses_timesheet",
    "fieldtype": "Check",
    "label": "Uses Timesheet"
+  },
+  {
+   "fieldname": "column_break_flexitime",
+   "fieldtype": "Column Break"
   },
   {
    "default": "0",

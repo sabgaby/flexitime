@@ -6,12 +6,6 @@ from frappe.model.document import Document
 
 
 class EmployeePresenceSettings(Document):
-	def onload(self):
-		"""Load flexitime balance from Employee doctype"""
-		if self.employee:
-			balance = frappe.db.get_value("Employee", self.employee, "custom_flexitime_balance") or 0
-			self.flexitime_balance = balance
-
 	def validate(self):
 		self.validate_duplicate_permissions()
 		self.validate_date_ranges()
